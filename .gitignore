@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# ChromaDB
+chroma_data/
+
+# Docker
+*.log
+
+# Session state (private development notes)
+session_state.md
+
+# Plan (private development notes) 
+PLAN.md
