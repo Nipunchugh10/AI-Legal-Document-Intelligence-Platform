@@ -1,0 +1,62 @@
+"""
+Core Configuration Module
+-------------------------
+Uses pydantic-settings to load and validate all environment variables
+from a .env file at the project root.
+"""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import lru_cache
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    # --- Database ---
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/legal_ai_db"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "legal_ai_db"
+
+    # --- JWT Authentication ---
+    JWT_SECRET_KEY: str = "your-super-secret-key-change-this"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # --- SMS OTP (Two-Factor Authentication) ---
+    SMS_API_KEY: str = ""
+    SMS_SENDER_ID: str = ""
+
+    # --- AI / LLM ---
+    ZAI_API_KEY: str = ""
+    ZAI_MODEL: str = "glm-4.7-flash"
+    ZAI_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
+
+    # --- Vector Database ---
+    CHROMA_PERSIST_DIR: str = "./chroma_data"
+
+    # --- Application ---
+    APP_ENV: str = "development"
+    DEBUG: bool = True
+    BACKEND_PORT: int = 8000
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # --- File Upload ---
+    UPLOAD_DIR: str = "./uploads"
+    MAX_UPLOAD_SIZE_MB: int = 10
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """
+    Returns a cached Settings instance.
+    The lru_cache ensures the .env file is only read once per process.
+    """
+    return Settings()
