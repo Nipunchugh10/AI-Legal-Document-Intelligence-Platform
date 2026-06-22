@@ -27,10 +27,9 @@ class Settings(BaseSettings):
     SMS_API_KEY: str = ""
     SMS_SENDER_ID: str = ""
 
-    # --- AI / LLM ---
-    ZAI_API_KEY: str = ""
-    ZAI_MODEL: str = "glm-4.7-flash"
-    ZAI_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
+    # --- AI / LLM (Google Gemini) ---
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash"
 
     # --- Vector Database ---
     CHROMA_PERSIST_DIR: str = "./chroma_data"

@@ -3,10 +3,8 @@ AI Legal Document Intelligence Platform
 ========================================
 FastAPI application entry point.
 
-Day 2 Deliverable:
-    - Health check endpoint at GET /health
-    - CORS middleware for frontend connection
-    - Lifespan event for startup/shutdown logging
+Day 2 — Health check endpoint, CORS, lifespan
+Day 4 — Auth router registered (/auth/register, /auth/login, /auth/me)
 """
 
 from contextlib import asynccontextmanager
@@ -16,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.api import auth as auth_router
 
 settings = get_settings()
 
@@ -67,6 +66,12 @@ app.add_middleware(
 
 
 # ------------------------------------------------------------------
+# Routers — Day 4 (more routers added in subsequent days)
+# ------------------------------------------------------------------
+app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
+
+
+# ------------------------------------------------------------------
 # Health Check — Day 2 Deliverable
 # ------------------------------------------------------------------
 @app.get(
@@ -85,6 +90,33 @@ async def health_check():
         "environment": settings.APP_ENV,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ------------------------------------------------------------------
+# LLM Test Endpoint
+# ------------------------------------------------------------------
+@app.post(
+    "/api/test-llm",
+    tags=["AI"],
+    summary="Test Gemini LLM Connection",
+    description="Sends a test prompt to the Google Gemini model to verify integration.",
+)
+async def test_llm(prompt: str = "Say 'Hello from Gemini'"):
+    """
+    Verifies the LLM Service and Gemini API Key are working.
+    """
+    from app.services.llm import get_llm_service
+    from fastapi import HTTPException
+    try:
+        service = get_llm_service()
+        response = service.generate_text(prompt)
+        return {
+            "status": "success",
+            "model": service.model_name,
+            "response": response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ------------------------------------------------------------------
