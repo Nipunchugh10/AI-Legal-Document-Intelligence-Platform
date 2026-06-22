@@ -20,6 +20,11 @@ python-dotenv==1.0.1
 # --- Authentication ---
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.2.1          # pin to 4.x — bcrypt 5.x is incompatible with passlib 1.7.4
+email-validator==2.3.0 # required for Pydantic EmailStr (added Day 4)
 
 # --- File Uploads ---
 python-multipart==0.0.12
+
+# --- AI / LLM ---
+google-generativeai>=0.8.0
