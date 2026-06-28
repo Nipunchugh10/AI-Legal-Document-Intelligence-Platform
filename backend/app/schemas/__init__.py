@@ -10,10 +10,12 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from app.schemas.contract import ContractResponse
 
 __all__ = [
     "RegisterRequest",
     "LoginRequest",
     "TokenResponse",
     "UserResponse",
+    "ContractResponse",
 ]
