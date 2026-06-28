@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.api import auth as auth_router
+from app.api import contracts as contracts_router
 
 settings = get_settings()
 
@@ -69,6 +70,7 @@ app.add_middleware(
 # Routers — Day 4 (more routers added in subsequent days)
 # ------------------------------------------------------------------
 app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
+app.include_router(contracts_router.router, prefix="/contracts", tags=["Contracts"])
 
 
 # ------------------------------------------------------------------
