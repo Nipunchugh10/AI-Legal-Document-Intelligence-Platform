@@ -25,7 +25,7 @@ The application maintains strict access control to protect sensitive legal docum
 
 ### 1. Token Model
 To support multi-device tracking, absolute session expiry, and token revoking, the authentication system uses a dual-token design:
-* **Access Token**: Short-lived JSON Web Token (JWT) with a **15-minute lifetime** containing the user identity (`sub` claim). Signed with `HS256` using `JWT_SECRET_KEY`.
+* **Access Token**: Short-lived JSON Web Token (JWT) with a **40-minute lifetime** containing the user identity (`sub` claim). Signed with `HS256` using `JWT_SECRET_KEY`.
 * **Refresh Token**: Long-lived secure token with a **7-day lifetime**. Stored in a database-backed session table, hashed at rest.
 
 ### 2. Database Schema: User Sessions
@@ -47,9 +47,9 @@ CREATE TABLE user_sessions (
 
 ### 3. Auto-Logout Policy
 To protect accounts on shared or unattended devices, the platform implements two timeout thresholds:
-* **Idle Timeout (15 minutes)**: 
-  * *Backend*: On every authenticated request, the backend updates `last_active_at`. If `last_active_at` is older than 15 minutes, the request is rejected with a `401 SESSION_EXPIRED` payload.
-  * *Frontend*: A client-side hook monitors mouse/keyboard interactions. A warning modal is shown at 13 minutes. If no action is taken by 15 minutes, local storage is cleared and the user is redirected to `/login`.
+* **Idle Timeout (40 minutes)**: 
+  * *Backend*: On every authenticated request, the backend updates `last_active_at`. If `last_active_at` is older than 40 minutes, the request is rejected with a `401 SESSION_EXPIRED` payload.
+  * *Frontend*: A client-side hook monitors mouse/keyboard interactions. A warning modal is shown at 38 minutes. If no action is taken by 40 minutes, local storage is cleared and the user is redirected to `/login`.
 * **Absolute Session Limit (7 days)**: Regardless of user activity, all sessions expire exactly 7 days after initial creation (`expires_at`), requiring a fresh password login.
 
 ### 4. Phone-Based Two-Factor Authentication (2FA)

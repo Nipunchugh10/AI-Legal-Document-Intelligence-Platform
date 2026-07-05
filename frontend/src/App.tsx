@@ -4,6 +4,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
 import { useAuthStore } from "./store/useAuthStore";
+import { IdleTimer } from "./components/IdleTimer";
 import "./App.css";
 
 // Route guard to check user login status before showing protected pages
@@ -38,6 +39,7 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <IdleTimer />
       <Routes>
         {/* Public auth routes */}
         <Route path="/login" element={<Login />} />
