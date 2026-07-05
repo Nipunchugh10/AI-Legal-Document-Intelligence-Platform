@@ -40,6 +40,47 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
+# --- Session & Refresh Tokens ──────────────────────────────────────────────────
+
+import hashlib
+import secrets
+
+
+def hash_token(token: str) -> str:
+    """Hash a plaintext token using SHA-256."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_refresh_token(
+    user_id: int,
+    db: Session,
+    device_info: Optional[str] = None,
+    ip_address: Optional[str] = None,
+) -> tuple[str, int]:
+    """
+    Generate a cryptographically secure random refresh token,
+    hash it, store the hash and metadata in the database (user_sessions),
+    and return the plaintext token to be returned to the client.
+    """
+    from app.models.user_session import UserSession  # local import
+
+    plain_token = secrets.token_hex(32)
+    token_hash = hash_token(plain_token)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    session = UserSession(
+        user_id=user_id,
+        refresh_token_hash=token_hash,
+        device_info=device_info,
+        ip_address=ip_address,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+
+    return plain_token, session.id
+
+
 # --- JWT Tokens ───────────────────────────────────────────────────────────────
 
 def create_access_token(
@@ -93,20 +134,24 @@ def decode_access_token(token: str) -> Optional[dict]:
 # wires up the auto-generated Authorize button in /docs
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
     """
     FastAPI dependency that extracts and validates the JWT from the
-    'Authorization: Bearer <token>' header, then returns the matching User.
+    'Authorization: Bearer <token>' header, checks the database-backed session,
+    enforces idle timeout (40 mins) and absolute expiry (7 days),
+    updates last_active_at, and returns the matching User.
 
     Raises:
-        HTTPException 401 — if token is missing, expired, malformed, or
-                            the embedded user no longer exists in the DB.
+        HTTPException 401 — if token is missing, expired, malformed,
+                            the session is idle/expired/revoked, or
+                            the user no longer exists in the DB.
     """
     from app.models.user import User  # local import avoids circular dependency
+    from app.models.user_session import UserSession  # local import
+    from datetime import datetime, timezone, timedelta
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -119,8 +164,41 @@ def get_current_user(
         raise credentials_exception
 
     email: Optional[str] = payload.get("sub")
-    if email is None:
+    session_id: Optional[int] = payload.get("session_id")
+    if email is None or session_id is None:
         raise credentials_exception
+
+    # Query and validate session record
+    session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    if not session or session.is_revoked:
+        raise credentials_exception
+
+    now = datetime.now(timezone.utc)
+
+    # 1. Check absolute session limit (7 days)
+    if session.expires_at < now:
+        session.is_revoked = True
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="SESSION_EXPIRED",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Check idle timeout (40 minutes)
+    idle_limit = timedelta(minutes=settings.SESSION_IDLE_TIMEOUT_MINUTES)
+    if now - session.last_active_at > idle_limit:
+        session.is_revoked = True
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="SESSION_EXPIRED",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Update session activity
+    session.last_active_at = now
+    db.commit()
 
     user = db.query(User).filter(User.email == email).first()
     if user is None:

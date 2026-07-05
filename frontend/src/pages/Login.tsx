@@ -51,22 +51,24 @@ export const Login: React.FC = () => {
         password: data.password,
       });
       
-      const { access_token } = response.data;
+      const { access_token, refresh_token } = response.data;
 
       // Temporary token storage so interceptor can fetch profile
       localStorage.setItem("access_token", access_token);
+      localStorage.setItem("refresh_token", refresh_token);
 
       // 2. Fetch user profile
       const userResponse = await api.get<User>("/auth/me");
       const user = userResponse.data;
 
       // 3. Save to Zustand store
-      login(access_token, user);
+      login(access_token, refresh_token, user);
       
       // Redirect to dashboard
       navigate("/dashboard");
     } catch (err: any) {
       localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       if (err.response && err.response.data && err.response.data.detail) {
         setErrorMsg(err.response.data.detail);
       } else {

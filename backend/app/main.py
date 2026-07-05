@@ -23,6 +23,30 @@ settings = get_settings()
 # ------------------------------------------------------------------
 # Lifespan: startup & shutdown events
 # ------------------------------------------------------------------
+import asyncio
+
+async def session_cleanup_loop():
+    """Background loop to run session cleanup task daily."""
+    from app.core.database import SessionLocal
+    from app.services.session_cleanup import clean_expired_sessions
+
+    print("[*] Starting background session cleanup loop...")
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                count = clean_expired_sessions(db)
+                if count > 0:
+                    print(f"[+] Session Cleanup: Revoked {count} expired/idle sessions.")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[-] Session Cleanup error: {e}")
+
+        # Run every 24 hours (86400 seconds)
+        await asyncio.sleep(86400)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs on application startup and shutdown."""
@@ -32,7 +56,14 @@ async def lifespan(app: FastAPI):
     print(f" Debug       : {settings.DEBUG}")
     print(f" Started at  : {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
+
+    # Start the session cleanup task in the background
+    cleanup_task = asyncio.create_task(session_cleanup_loop())
+
     yield
+
+    # Cancel cleanup task on shutdown
+    cleanup_task.cancel()
     print("Shutting down...")
 
 
@@ -101,14 +132,19 @@ async def health_check():
     "/api/test-llm",
     tags=["AI"],
     summary="Test Gemini LLM Connection",
-    description="Sends a test prompt to the Google Gemini model to verify integration.",
+    description="Sends a test prompt to the Google Gemini model to verify integration. Requires authentication. Only available in development.",
 )
 async def test_llm(prompt: str = "Say 'Hello from Gemini'"):
     """
     Verifies the LLM Service and Gemini API Key are working.
+    Restricted to development environment to prevent unauthorized API usage.
     """
-    from app.services.llm import get_llm_service
     from fastapi import HTTPException
+
+    if settings.APP_ENV != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    from app.services.llm import get_llm_service
     try:
         service = get_llm_service()
         response = service.generate_text(prompt)
