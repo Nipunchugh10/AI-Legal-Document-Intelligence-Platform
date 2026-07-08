@@ -11,6 +11,8 @@ NOTE: This is intentionally a single-token (access token only) system.
       implemented in Phase 2A (Days 8–15).
 """
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -41,9 +43,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 # --- Session & Refresh Tokens ──────────────────────────────────────────────────
-
-import hashlib
-import secrets
 
 
 def hash_token(token: str) -> str:

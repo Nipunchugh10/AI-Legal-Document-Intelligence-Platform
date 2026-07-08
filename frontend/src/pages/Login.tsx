@@ -233,6 +233,8 @@ export const Login: React.FC = () => {
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                   disabled={isSubmitting}
+                  title={`Verification digit ${idx + 1}`}
+                  placeholder="-"
                 />
               ))}
             </div>
@@ -240,41 +242,32 @@ export const Login: React.FC = () => {
             <button
               onClick={() => handle2faVerify()}
               disabled={isSubmitting}
-              className="btn btn-primary"
-              style={{ width: "100%", marginTop: "12px" }}
+              className="btn btn-primary w-full mt-3"
             >
               {isSubmitting ? (
-                <div className="spinner" style={{ width: "18px", height: "18px" }} />
+                <div className="spinner spinner-sm" />
               ) : (
                 "Verify & Log In"
               )}
             </button>
 
-            <div className="auth-footer" style={{ marginTop: "24px" }}>
+            <div className="auth-footer mt-6">
               Didn't receive the code?{" "}
               {resendCooldown > 0 ? (
-                <span style={{ color: "var(--color-text-dark)" }}>
+                <span className="text-dark">
                   Resend code in {resendCooldown}s
                 </span>
               ) : (
                 <button
                   onClick={handleResendOtp}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--color-primary)",
-                    cursor: "pointer",
-                    padding: 0,
-                    font: "inherit",
-                    fontWeight: 600,
-                  }}
+                  className="btn-inline-primary"
                 >
                   Resend code
                 </button>
               )}
             </div>
 
-            <div className="auth-footer" style={{ marginTop: "12px" }}>
+            <div className="auth-footer mt-3">
               <button
                 onClick={() => {
                   setRequires2fa(false);
@@ -283,14 +276,7 @@ export const Login: React.FC = () => {
                   setOtpSuccessMsg(null);
                   setOtpDigits(["", "", "", "", "", ""]);
                 }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--color-text-muted)",
-                  cursor: "pointer",
-                  padding: 0,
-                  font: "inherit",
-                }}
+                className="btn-inline-muted"
               >
                 Back to Login
               </button>
@@ -329,8 +315,7 @@ export const Login: React.FC = () => {
               id="email"
               type="email"
               placeholder="name@company.com"
-              className="form-control"
-              style={{ borderColor: errors.email ? "var(--color-danger)" : "" }}
+              className={`form-control ${errors.email ? "is-invalid" : ""}`}
               {...register("email", {
                 required: "Email is required",
                 pattern: {
@@ -340,7 +325,7 @@ export const Login: React.FC = () => {
               })}
             />
             {errors.email && (
-              <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <span className="error-msg-text">
                 {errors.email.message}
               </span>
             )}
@@ -354,14 +339,13 @@ export const Login: React.FC = () => {
               id="password"
               type="password"
               placeholder="••••••••"
-              className="form-control"
-              style={{ borderColor: errors.password ? "var(--color-danger)" : "" }}
+              className={`form-control ${errors.password ? "is-invalid" : ""}`}
               {...register("password", {
                 required: "Password is required",
               })}
             />
             {errors.password && (
-              <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <span className="error-msg-text">
                 {errors.password.message}
               </span>
             )}
@@ -370,10 +354,9 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn btn-primary"
-            style={{ width: "100%", marginTop: "12px" }}
+            className="btn btn-primary w-full mt-3"
           >
-            {isSubmitting ? <div className="spinner" style={{ width: "18px", height: "18px" }} /> : "Log In"}
+            {isSubmitting ? <div className="spinner spinner-sm" /> : "Log In"}
           </button>
         </form>
 

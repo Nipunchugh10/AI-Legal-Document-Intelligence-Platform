@@ -88,8 +88,7 @@ export const Register: React.FC = () => {
               id="email"
               type="email"
               placeholder="name@company.com"
-              className="form-control"
-              style={{ borderColor: errors.email ? "var(--color-danger)" : "" }}
+              className={`form-control ${errors.email ? "is-invalid" : ""}`}
               {...register("email", {
                 required: "Email is required",
                 pattern: {
@@ -99,7 +98,7 @@ export const Register: React.FC = () => {
               })}
             />
             {errors.email && (
-              <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <span className="error-msg-text">
                 {errors.email.message}
               </span>
             )}
@@ -113,8 +112,7 @@ export const Register: React.FC = () => {
               id="password"
               type="password"
               placeholder="••••••••"
-              className="form-control"
-              style={{ borderColor: errors.password ? "var(--color-danger)" : "" }}
+              className={`form-control ${errors.password ? "is-invalid" : ""}`}
               {...register("password", {
                 required: "Password is required",
                 minLength: {
@@ -124,7 +122,7 @@ export const Register: React.FC = () => {
               })}
             />
             {errors.password && (
-              <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <span className="error-msg-text">
                 {errors.password.message}
               </span>
             )}
@@ -138,8 +136,7 @@ export const Register: React.FC = () => {
               id="confirmPassword"
               type="password"
               placeholder="••••••••"
-              className="form-control"
-              style={{ borderColor: errors.confirmPassword ? "var(--color-danger)" : "" }}
+              className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
               {...register("confirmPassword", {
                 required: "Please confirm your password",
                 validate: (value) =>
@@ -147,7 +144,7 @@ export const Register: React.FC = () => {
               })}
             />
             {errors.confirmPassword && (
-              <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <span className="error-msg-text">
                 {errors.confirmPassword.message}
               </span>
             )}
@@ -156,10 +153,9 @@ export const Register: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn btn-primary"
-            style={{ width: "100%", marginTop: "12px" }}
+            className="btn btn-primary w-full mt-3"
           >
-            {isSubmitting ? <div className="spinner" style={{ width: "18px", height: "18px" }} /> : "Register"}
+            {isSubmitting ? <div className="spinner spinner-sm" /> : "Register"}
           </button>
         </form>
 

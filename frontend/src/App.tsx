@@ -22,7 +22,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
     return (
       <div className="page-loader">
         <div className="spinner" />
-        <p style={{ marginTop: "12px", color: "var(--color-text-muted)" }}>Verifying session...</p>
+        <p className="loader-text">Verifying session...</p>
       </div>
     );
   }
