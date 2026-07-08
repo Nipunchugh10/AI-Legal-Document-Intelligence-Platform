@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import api from "../services/api";
@@ -18,6 +18,16 @@ export const Login: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExpiredAlert, setShowExpiredAlert] = useState(false);
+
+  // 2FA login state
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [maskedMessage, setMaskedMessage] = useState("");
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpSuccessMsg, setOtpSuccessMsg] = useState<string | null>(null);
+
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const {
     register,
@@ -39,6 +49,48 @@ export const Login: React.FC = () => {
     }
   }, [searchParams]);
 
+  // Handle 30-second cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  // Web OTP API for auto-filling SMS code on mobile devices
+  useEffect(() => {
+    if (!requires2fa || !("OTPCredential" in window)) return;
+
+    const ac = new AbortController();
+    navigator.credentials
+      .get({
+        otp: { transport: ["sms"] },
+        signal: ac.signal,
+      } as any)
+      .then((otp: any) => {
+        if (otp && otp.code) {
+          const digits = otp.code.slice(0, 6).split("");
+          const newDigits = ["", "", "", "", "", ""];
+          for (let i = 0; i < digits.length; i++) {
+            newDigits[i] = digits[i];
+          }
+          setOtpDigits(newDigits);
+          
+          if (otp.code.length === 6) {
+            handle2faVerify(otp.code);
+          }
+        }
+      })
+      .catch((err) => {
+        console.log("Web OTP error:", err);
+      });
+
+    return () => {
+      ac.abort();
+    };
+  }, [requires2fa]);
+
   const onSubmit = async (data: LoginFormData) => {
     setErrorMsg(null);
     setIsSubmitting(true);
@@ -51,7 +103,16 @@ export const Login: React.FC = () => {
         password: data.password,
       });
       
-      const { access_token, refresh_token } = response.data;
+      const { access_token, refresh_token, requires_2fa, pending_2fa_token, message } = response.data;
+
+      // If user requires two-factor authentication
+      if (requires_2fa) {
+        setPendingToken(pending_2fa_token);
+        setMaskedMessage(message || "Enter the verification code sent to your registered email address.");
+        setRequires2fa(true);
+        setResendCooldown(30);
+        return;
+      }
 
       // Temporary token storage so interceptor can fetch profile
       localStorage.setItem("access_token", access_token);
@@ -79,6 +140,198 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return; // numeric only
+    const newDigits = [...otpDigits];
+    
+    // If user pasted or typed multiple digits
+    if (value.length > 1) {
+      const digits = value.slice(0, 6 - index).split("");
+      for (let i = 0; i < digits.length; i++) {
+        newDigits[index + i] = digits[i];
+      }
+      setOtpDigits(newDigits);
+      
+      const nextIndex = Math.min(index + digits.length, 5);
+      inputRefs.current[nextIndex]?.focus();
+    } else {
+      newDigits[index] = value;
+      setOtpDigits(newDigits);
+      if (value && index < 5) {
+        inputRefs.current[index + 1]?.focus();
+      }
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handle2faVerify = async (codeOverride?: string) => {
+    const code = codeOverride || otpDigits.join("");
+    if (code.length !== 6) {
+      setErrorMsg("Please enter all 6 digits of the verification code.");
+      return;
+    }
+    setErrorMsg(null);
+    setOtpSuccessMsg(null);
+    setIsSubmitting(true);
+
+    try {
+      const response = await api.post("/auth/2fa/login-verify", {
+        pending_2fa_token: pendingToken,
+        otp_code: code,
+      });
+      
+      const { access_token, refresh_token } = response.data;
+
+      // Temporary token storage so interceptor can fetch profile
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("refresh_token", refresh_token);
+
+      // Fetch user profile
+      const userResponse = await api.get<User>("/auth/me");
+      const user = userResponse.data;
+
+      // Save to Zustand store
+      login(access_token, refresh_token, user);
+      
+      // Redirect to dashboard
+      navigate("/dashboard");
+    } catch (err: any) {
+      if (err.response && err.response.data && err.response.data.detail) {
+        setErrorMsg(err.response.data.detail);
+      } else {
+        setErrorMsg("Verification failed. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setErrorMsg(null);
+    setOtpSuccessMsg(null);
+
+    try {
+      await api.post("/auth/2fa/resend-otp", {
+        pending_2fa_token: pendingToken,
+      });
+      setOtpSuccessMsg("A new verification code has been sent.");
+      setResendCooldown(30);
+    } catch (err: any) {
+      if (err.response && err.response.data && err.response.data.detail) {
+        setErrorMsg(err.response.data.detail);
+      } else {
+        setErrorMsg("Failed to resend code. Please try again.");
+      }
+    }
+  };
+
+  // Render 2FA verification panel
+  if (requires2fa) {
+    return (
+      <div className="auth-container">
+        <div className="glass-panel auth-card">
+          <h2 className="auth-title">Enter Verification Code</h2>
+          <p className="auth-subtitle">{maskedMessage}</p>
+
+          {otpSuccessMsg && (
+            <div className="alert alert-success">
+              {otpSuccessMsg}
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="alert alert-danger">
+              {errorMsg}
+            </div>
+          )}
+          <div>
+            <div className="otp-container">
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  type="text"
+                  maxLength={6}
+                  value={digit}
+                  className="otp-digit-input"
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  disabled={isSubmitting}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => handle2faVerify()}
+              disabled={isSubmitting}
+              className="btn btn-primary"
+              style={{ width: "100%", marginTop: "12px" }}
+            >
+              {isSubmitting ? (
+                <div className="spinner" style={{ width: "18px", height: "18px" }} />
+              ) : (
+                "Verify & Log In"
+              )}
+            </button>
+
+            <div className="auth-footer" style={{ marginTop: "24px" }}>
+              Didn't receive the code?{" "}
+              {resendCooldown > 0 ? (
+                <span style={{ color: "var(--color-text-dark)" }}>
+                  Resend code in {resendCooldown}s
+                </span>
+              ) : (
+                <button
+                  onClick={handleResendOtp}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-primary)",
+                    cursor: "pointer",
+                    padding: 0,
+                    font: "inherit",
+                    fontWeight: 600,
+                  }}
+                >
+                  Resend code
+                </button>
+              )}
+            </div>
+
+            <div className="auth-footer" style={{ marginTop: "12px" }}>
+              <button
+                onClick={() => {
+                  setRequires2fa(false);
+                  setPendingToken(null);
+                  setErrorMsg(null);
+                  setOtpSuccessMsg(null);
+                  setOtpDigits(["", "", "", "", "", ""]);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--color-text-muted)",
+                  cursor: "pointer",
+                  padding: 0,
+                  font: "inherit",
+                }}
+              >
+                Back to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render standard login form
   return (
     <div className="auth-container">
       <div className="glass-panel auth-card">

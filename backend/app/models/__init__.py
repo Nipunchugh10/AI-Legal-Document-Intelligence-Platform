@@ -18,7 +18,7 @@ from app.models.contract import Contract
 from app.models.analysis import Analysis
 from app.models.audit_log import AuditLog
 from app.models.user_session import UserSession
-from app.models.phone_otp import PhoneOTPVerification
+from app.models.email_otp import EmailOTPVerification
 
 __all__ = [
     "User",
@@ -26,5 +26,5 @@ __all__ = [
     "Analysis",
     "AuditLog",
     "UserSession",
-    "PhoneOTPVerification",
+    "EmailOTPVerification",
 ]

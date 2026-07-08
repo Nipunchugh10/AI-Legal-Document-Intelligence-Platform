@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
+import { Security } from "./pages/Security";
 import { useAuthStore } from "./store/useAuthStore";
 import { IdleTimer } from "./components/IdleTimer";
 import "./App.css";
@@ -51,6 +52,16 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Protected security settings */}
+        <Route
+          path="/security"
+          element={
+            <ProtectedRoute>
+              <Security />
             </ProtectedRoute>
           }
         />
