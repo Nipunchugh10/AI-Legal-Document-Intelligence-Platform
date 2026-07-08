@@ -35,38 +35,7 @@ export const Security: React.FC = () => {
     return () => clearTimeout(timer);
   }, [step, otpExpirySeconds]);
 
-  // Web OTP API for auto-fill on mobile
-  useEffect(() => {
-    if (step !== "verify" || !("OTPCredential" in window)) return;
 
-    const ac = new AbortController();
-    navigator.credentials
-      .get({
-        otp: { transport: ["sms"] },
-        signal: ac.signal,
-      } as any)
-      .then((otp: any) => {
-        if (otp && otp.code) {
-          const digits = otp.code.slice(0, 6).split("");
-          const newDigits = ["", "", "", "", "", ""];
-          for (let i = 0; i < digits.length; i++) {
-            newDigits[i] = digits[i];
-          }
-          setOtpDigits(newDigits);
-
-          if (otp.code.length === 6) {
-            verifyOtpCode(otp.code);
-          }
-        }
-      })
-      .catch((err) => {
-        console.log("Web OTP error:", err);
-      });
-
-    return () => {
-      ac.abort();
-    };
-  }, [step]);
 
   const handleEnable2FA = async () => {
     setIsSubmitting(true);

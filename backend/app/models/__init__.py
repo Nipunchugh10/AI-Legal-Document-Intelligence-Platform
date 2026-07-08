@@ -10,7 +10,7 @@ Current models:
   Analysis              → analyses table
   AuditLog              → audit_logs table
   UserSession           → user_sessions table
-  PhoneOTPVerification  → phone_otp_verifications table
+  EmailOTPVerification  → email_otp_verifications table
 """
 
 from app.models.user import User

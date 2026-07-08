@@ -58,38 +58,8 @@ export const Login: React.FC = () => {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  // Web OTP API for auto-filling SMS code on mobile devices
-  useEffect(() => {
-    if (!requires2fa || !("OTPCredential" in window)) return;
 
-    const ac = new AbortController();
-    navigator.credentials
-      .get({
-        otp: { transport: ["sms"] },
-        signal: ac.signal,
-      } as any)
-      .then((otp: any) => {
-        if (otp && otp.code) {
-          const digits = otp.code.slice(0, 6).split("");
-          const newDigits = ["", "", "", "", "", ""];
-          for (let i = 0; i < digits.length; i++) {
-            newDigits[i] = digits[i];
-          }
-          setOtpDigits(newDigits);
-          
-          if (otp.code.length === 6) {
-            handle2faVerify(otp.code);
-          }
-        }
-      })
-      .catch((err) => {
-        console.log("Web OTP error:", err);
-      });
 
-    return () => {
-      ac.abort();
-    };
-  }, [requires2fa]);
 
   const onSubmit = async (data: LoginFormData) => {
     setErrorMsg(null);
