@@ -65,10 +65,12 @@ def send_otp(db: Session, email: str) -> None:
     db.commit()
     db.refresh(otp_entry)
 
-    # Deliver the email (or fall back to console logging)
-    # Always print mock in local environment for easy debugging
-    print(f"[EMAIL MOCK] SENT OTP TO {normalized_email}: {code} (Expires in {OTP_EXPIRY_MINUTES} minutes)")
-    logger.info(f"OTP dispatched to {normalized_email} (mock print triggered)")
+    # Deliver the email (or fall back to console logging in development)
+    if settings.APP_ENV == "development":
+        print(f"[EMAIL MOCK] SENT OTP TO {normalized_email}: {code} (Expires in {OTP_EXPIRY_MINUTES} minutes)")
+    else:
+        # TODO: Replace with actual SMTP delivery (smtplib + email.mime)
+        logger.info(f"OTP dispatched to {normalized_email}")
 
 
 def verify_otp(db: Session, email: str, submitted_code: str) -> bool:

@@ -30,9 +30,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     SESSION_IDLE_TIMEOUT_MINUTES: int = 40
 
-    # --- SMS OTP (Two-Factor Authentication) ---
-    SMS_API_KEY: str = ""
-    SMS_SENDER_ID: str = ""
+    # --- SMTP (Email 2FA) — configured when moving to production ---
+    # SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
+    # (Currently using console mock for local development)
 
     # --- AI / LLM (Google Gemini) ---
     GEMINI_API_KEY: str = ""
