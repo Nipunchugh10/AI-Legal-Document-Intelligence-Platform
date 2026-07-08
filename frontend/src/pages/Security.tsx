@@ -179,34 +179,34 @@ export const Security: React.FC = () => {
         </div>
         <div className="navbar-actions">
           <span className="user-email">{user?.email}</span>
-          <button onClick={() => navigate("/dashboard")} className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
+          <button onClick={() => navigate("/dashboard")} className="btn btn-secondary btn-nav-action">
             Workspace
           </button>
         </div>
       </header>
 
       {/* Main Security Settings Panel */}
-      <main className="main-content page-container" style={{ display: "flex", justifyContent: "center", paddingTop: "40px" }}>
-        <div className="glass-panel" style={{ width: "100%", maxWidth: "560px", padding: "40px" }}>
+      <main className="main-content page-container flex-center-pt10">
+        <div className="glass-panel panel-auth-setting">
 
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-            <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: "var(--color-primary)" }}>
+          <div className="flex-align-center-gap3-mb2">
+            <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
-            <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>Security Settings</h2>
+            <h2 className="title-setting">Security Settings</h2>
           </div>
-          <p style={{ fontSize: "0.9rem", color: "var(--color-text-muted)", marginBottom: "30px" }}>
+          <p className="text-muted-desc-lg">
             Configure and manage safety credentials for legal document accesses
           </p>
 
           {successMsg && (
-            <div className="alert alert-success" style={{ marginBottom: "24px" }}>
+            <div className="alert alert-success mb-6">
               {successMsg}
             </div>
           )}
 
           {errorMsg && (
-            <div className="alert alert-danger" style={{ marginBottom: "24px" }}>
+            <div className="alert alert-danger mb-6">
               {errorMsg}
             </div>
           )}
@@ -216,28 +216,27 @@ export const Security: React.FC = () => {
             <div>
               {user?.is_2fa_enabled ? (
                 <div>
-                  <div className="alert alert-success" style={{ background: "rgba(16, 185, 129, 0.05)", border: "1px solid rgba(16, 185, 129, 0.2)", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px", padding: "20px", borderRadius: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-success)", fontWeight: 700, fontSize: "1.05rem" }}>
+                  <div className="status-card-active">
+                    <div className="status-title-active">
                       <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       Two-Factor Authentication is Active
                     </div>
-                    <p style={{ color: "var(--color-text-main)", fontSize: "0.9rem", margin: 0 }}>
-                      Verification email codes will be delivered to: <strong style={{ color: "var(--color-secondary)" }}>{maskEmail(user?.email)}</strong>
+                    <p className="status-desc-active">
+                      Verification email codes will be delivered to: <strong className="text-secondary-color">{maskEmail(user?.email)}</strong>
                     </p>
                   </div>
 
-                  <div style={{ marginTop: "30px", borderTop: "1px solid var(--color-border)", paddingTop: "20px" }}>
-                    <h4 style={{ fontSize: "1.05rem", marginBottom: "8px" }}>Disable 2FA</h4>
-                    <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", marginBottom: "20px" }}>
+                  <div className="section-danger-zone">
+                    <h4 className="title-section-sm">Disable 2FA</h4>
+                    <p className="text-muted-sm mb-5">
                       If you disable two-factor authentication, you will only need your email and password to log in. This lowers your account security.
                     </p>
                     <button
                       onClick={handleDisable2FA}
                       disabled={isSubmitting}
-                      className="btn btn-secondary"
-                      style={{ color: "var(--color-danger)", borderColor: "rgba(239, 68, 68, 0.2)" }}
+                      className="btn btn-secondary btn-danger-outline"
                     >
                       Disable 2FA
                     </button>
@@ -245,19 +244,18 @@ export const Security: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
-                    <h3 style={{ fontSize: "1.15rem", fontWeight: 600 }}>Enable Two-Factor Authentication (2FA)</h3>
-                    <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
-                      We'll send a 6-digit verification code to your registered email (<strong style={{ color: "var(--color-text-main)" }}>{maskEmail(user?.email)}</strong>) each time you log in, ensuring that only you can access your legal workspace.
+                  <div className="flex-column-gap1-mb6">
+                    <h3 className="title-subsection">Enable Two-Factor Authentication (2FA)</h3>
+                    <p className="text-muted-sm">
+                      We'll send a 6-digit verification code to your registered email (<strong className="text-main">{maskEmail(user?.email)}</strong>) each time you log in, ensuring that only you can access your legal workspace.
                     </p>
                   </div>
                   <button
                     onClick={handleEnable2FA}
                     disabled={isSubmitting}
-                    className="btn btn-primary"
-                    style={{ width: "100%" }}
+                    className="btn btn-primary w-full"
                   >
-                    {isSubmitting ? <div className="spinner" style={{ width: "18px", height: "18px" }} /> : "Enable Email 2FA"}
+                    {isSubmitting ? <div className="spinner spinner-sm" /> : "Enable Email 2FA"}
                   </button>
                 </div>
               )}
@@ -267,10 +265,10 @@ export const Security: React.FC = () => {
           {/* STEP 2: OTP Verification Form */}
           {step === "verify" && (
             <div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
-                <h3 style={{ fontSize: "1.15rem", fontWeight: 600 }}>Verify Your Email</h3>
-                <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
-                  Enter the 6-digit OTP code sent to <strong style={{ color: "var(--color-text-main)" }}>{maskEmail(user?.email)}</strong>. Code expires in: <span className="countdown-timer">{formatExpiryTime(otpExpirySeconds)}</span>
+              <div className="flex-column-gap1-mb5">
+                <h3 className="title-subsection">Verify Your Email</h3>
+                <p className="text-muted-sm">
+                  Enter the 6-digit OTP code sent to <strong className="text-main">{maskEmail(user?.email)}</strong>. Code expires in: <span className="countdown-timer">{formatExpiryTime(otpExpirySeconds)}</span>
                 </p>
               </div>
 
@@ -286,24 +284,25 @@ export const Security: React.FC = () => {
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                     disabled={isSubmitting}
+                    title={`Verification digit ${idx + 1}`}
+                    placeholder="-"
                   />
                 ))}
               </div>
 
               {otpExpirySeconds <= 0 && (
-                <div className="alert alert-danger" style={{ fontSize: "0.8rem", padding: "10px", marginTop: "10px" }}>
+                <div className="alert alert-danger alert-expired">
                   The code has expired. Please go back and request a new code.
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "12px", marginTop: "30px" }}>
+              <div className="flex-gap3-mt10">
                 <button
                   onClick={() => verifyOtpCode()}
                   disabled={isSubmitting || otpDigits.join("").length !== 6 || otpExpirySeconds <= 0}
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  className="btn btn-primary flex-1"
                 >
-                  {isSubmitting ? <div className="spinner" style={{ width: "18px", height: "18px" }} /> : "Verify & Activate"}
+                  {isSubmitting ? <div className="spinner spinner-sm" /> : "Verify & Activate"}
                 </button>
                 <button
                   type="button"

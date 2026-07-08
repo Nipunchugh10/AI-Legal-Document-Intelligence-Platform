@@ -124,10 +124,10 @@ export const Dashboard: React.FC = () => {
         </div>
         <div className="navbar-actions">
           <span className="user-email">{user?.email}</span>
-          <button onClick={() => navigate("/security")} className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem", marginRight: "8px" }}>
+          <button onClick={() => navigate("/security")} className="btn btn-secondary btn-nav-action">
             Security Settings
           </button>
-          <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
+          <button onClick={handleLogout} className="btn btn-secondary btn-nav-action">
             Sign Out
           </button>
         </div>
@@ -136,32 +136,32 @@ export const Dashboard: React.FC = () => {
       {/* Main Workspace Dashboard */}
       <main className="main-content page-container">
         {/* Welcome Section */}
-        <section className="mb-4" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "20px" }}>
+        <section className="mb-4 flex-between-end-wrap">
           <div>
-            <h1 style={{ fontSize: "2.2rem", fontWeight: 800 }}>Workspace</h1>
-            <p style={{ marginTop: "4px" }}>Analyze documents, track risks, and manage your legal workflow</p>
+            <h1 className="title-large">Workspace</h1>
+            <p className="mt-1">Analyze documents, track risks, and manage your legal workflow</p>
           </div>
         </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "30px", alignItems: "start" }} className="dashboard-grid">
+        <div className="grid-main-sidebar dashboard-grid">
           {/* Contracts List Panel */}
-          <div className="glass-panel" style={{ padding: "30px", minHeight: "400px" }}>
-            <h3 style={{ fontSize: "1.25rem", marginBottom: "20px" }}>Your Contracts</h3>
+          <div className="glass-panel panel-padded-lg min-h-400">
+            <h3 className="title-panel">Your Contracts</h3>
 
             {isLoading ? (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px" }}>
+              <div className="flex-center-h200">
                 <div className="spinner" />
               </div>
             ) : contracts.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "260px", color: "var(--color-text-dark)" }}>
-                <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ marginBottom: "16px", opacity: 0.5 }}>
+              <div className="empty-state-container">
+                <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="icon-muted-lg">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                <p style={{ fontSize: "0.95rem", fontWeight: 500 }}>No contracts uploaded yet.</p>
-                <p style={{ fontSize: "0.85rem", marginTop: "4px" }}>Upload a PDF on the right to start analysis.</p>
+                <p className="text-semibold-md">No contracts uploaded yet.</p>
+                <p className="text-muted-sm-mt1">Upload a PDF on the right to start analysis.</p>
               </div>
             ) : (
-              <div className="table-wrapper" style={{ overflowX: "auto" }}>
+              <div className="table-wrapper overflow-x-auto">
                 <table className="contracts-table">
                   <thead>
                     <tr>
@@ -174,7 +174,7 @@ export const Dashboard: React.FC = () => {
                   <tbody>
                     {contracts.map((contract) => (
                       <tr key={contract.id}>
-                        <td style={{ fontWeight: 600, color: "var(--color-text-main)" }}>
+                        <td className="text-bold-main">
                           {contract.filename}
                         </td>
                         <td>{formatDate(contract.created_at)}</td>
@@ -185,8 +185,7 @@ export const Dashboard: React.FC = () => {
                         </td>
                         <td>
                           <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: "6px 12px", fontSize: "0.8rem", borderRadius: "6px" }}
+                            className="btn btn-secondary btn-table-action" 
                             onClick={() => alert(`Day 16+ parsing details will open contract ${contract.id}`)}
                           >
                             View Analysis
@@ -201,20 +200,20 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Upload Sidebar */}
-          <div className="glass-panel" style={{ padding: "30px" }}>
-            <h3 style={{ fontSize: "1.25rem", marginBottom: "8px" }}>Upload Document</h3>
-            <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", marginBottom: "20px" }}>
+          <div className="glass-panel panel-padded-lg">
+            <h3 className="title-panel-sm">Upload Document</h3>
+            <p className="text-muted-desc">
               Upload your agreement in PDF format. We support file sizes up to 10MB.
             </p>
 
             {uploadError && (
-              <div className="alert alert-danger" style={{ padding: "10px", fontSize: "0.8rem" }}>
+              <div className="alert alert-danger alert-sm">
                 {uploadError}
               </div>
             )}
 
             {uploadSuccess && (
-              <div className="alert alert-success" style={{ padding: "10px", fontSize: "0.8rem" }}>
+              <div className="alert alert-success alert-sm">
                 File uploaded successfully!
               </div>
             )}
@@ -226,21 +225,21 @@ export const Dashboard: React.FC = () => {
                 accept=".pdf"
                 onChange={handleFileUpload}
                 disabled={isUploading}
-                style={{ display: "none" }}
+                className="d-none"
               />
               <label htmlFor="contract-file-upload" className="dropzone-label">
                 {isUploading ? (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                  <div className="flex-column-center-gap2">
                     <div className="spinner" />
-                    <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>Uploading file...</span>
+                    <span className="text-semibold-sm">Uploading file...</span>
                   </div>
                 ) : (
                   <>
-                    <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ marginBottom: "12px", color: "var(--color-primary)" }}>
+                    <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="icon-primary-md">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                     </svg>
-                    <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>Choose PDF file</span>
-                    <span style={{ fontSize: "0.75rem", color: "var(--color-text-dark)", marginTop: "4px" }}>Click to select files</span>
+                    <span className="text-bold-md">Choose PDF file</span>
+                    <span className="text-dark-xs-mt1">Click to select files</span>
                   </>
                 )}
               </label>
