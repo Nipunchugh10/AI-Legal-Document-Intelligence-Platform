@@ -124,6 +124,9 @@ export const Dashboard: React.FC = () => {
         </div>
         <div className="navbar-actions">
           <span className="user-email">{user?.email}</span>
+          <button onClick={() => navigate("/security")} className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem", marginRight: "8px" }}>
+            Security Settings
+          </button>
           <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
             Sign Out
           </button>

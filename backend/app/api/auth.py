@@ -2,19 +2,21 @@
 Authentication Router
 ---------------------
 Endpoints:
-    POST /auth/register   — create a new user account
-    POST /auth/login      — verify credentials, return JWT access token
-    GET  /auth/me         — return current authenticated user info
-
-Day 4 — Basic Authentication System
-
-NOTE: This is a first-version auth system (access token only).
-      Refresh tokens, server-side sessions, auto-logout, and SMS OTP 2FA
-      are implemented in Phase 2A (Days 8–15).
+    POST /auth/register     — create a new user account
+    POST /auth/login        — verify credentials, return JWT access token or trigger 2FA
+    GET  /auth/me           — return current authenticated user info
+    POST /auth/refresh      — refresh expired access token
+    POST /auth/logout       — log out and revoke session
+    POST /auth/2fa/enable   — trigger OTP sending to enable Email 2FA
+    POST /auth/2fa/confirm  — confirm OTP code to activate Email 2FA
+    POST /auth/2fa/disable  — disable Email 2FA for the account
+    POST /auth/2fa/login-verify  — verify 2FA OTP at login
+    POST /auth/2fa/resend-otp    — resend 2FA OTP with 30-second cooldown
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from datetime import timedelta, datetime, timezone
 
 from app.core.database import get_db
 from app.core.security import (
@@ -31,11 +33,23 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
     RefreshRequest,
-    OTPRequest,
-    OTPVerifyRequest,
+    Email2FAConfirmRequest,
+    LoginVerify2FARequest,
+    Resend2FAOTPRequest,
 )
 
 router = APIRouter()
+
+
+def mask_email(email: str) -> str:
+    """Mask email for privacy, e.g. nipunchugh553@gmail.com -> n••••3@gmail.com"""
+    parts = email.split("@")
+    if len(parts) != 2:
+        return email
+    name, domain = parts
+    if len(name) <= 2:
+        return name[0] + "••••" + "@" + domain
+    return name[0] + "••••" + name[-1] + "@" + domain
 
 
 # ── POST /auth/register ────────────────────────────────────────────────────────
@@ -47,7 +61,7 @@ router = APIRouter()
     summary="Register a new user account",
     description=(
         "Creates a new user account. The password is stored as a bcrypt hash — "
-        "the plaintext is never persisted. Returns the created user (minus password)."
+        "the plaintext is never persisted. Returns the created user."
     ),
 )
 def register(
@@ -68,6 +82,7 @@ def register(
         email=body.email,
         hashed_password=hash_password(body.password),
         is_active=True,
+        is_2fa_enabled=False,
     )
     db.add(user)
     db.commit()
@@ -83,7 +98,7 @@ def register(
     summary="Log in and receive access & refresh tokens",
     description=(
         "Verifies email and password. On success, returns a signed JWT access token "
-        "and a secure database-backed refresh token."
+        "and a secure database-backed refresh token. If Email 2FA is enabled, triggers OTP and returns a pending token."
     ),
 )
 def login(
@@ -91,11 +106,12 @@ def login(
     request: Request,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
-    """Authenticate a user, establish a session, and issue access & refresh tokens."""
+    """Authenticate a user, establish a session, and issue access & refresh tokens or trigger 2FA."""
+    from app.services.otp_service import send_otp
+
     user = db.query(User).filter(User.email == body.email).first()
 
-    # Use the same error message regardless of whether email or password is wrong
-    # to prevent user enumeration via error message differences
+    # Generic error message to prevent account enumeration
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -107,6 +123,23 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Account is inactive",
+        )
+
+    # Check if user has Email 2FA enabled
+    if user.is_2fa_enabled:
+        # Trigger OTP sending to registered email
+        send_otp(db, user.email)
+
+        # Generate a short-lived pending 2FA token (expires in 5 minutes)
+        pending_2fa_token = create_access_token(
+            data={"sub": user.email, "pending_2fa": True},
+            expires_delta=timedelta(minutes=5)
+        )
+
+        return TokenResponse(
+            requires_2fa=True,
+            pending_2fa_token=pending_2fa_token,
+            message=f"Code sent to {mask_email(user.email)}"
         )
 
     # Extract client IP and user-agent for session tracking
@@ -134,10 +167,7 @@ def login(
     "/me",
     response_model=UserResponse,
     summary="Get current authenticated user",
-    description=(
-        "Returns the profile of the currently authenticated user. "
-        "Requires a valid 'Authorization: Bearer <token>' header."
-    ),
+    description="Returns the profile of the currently authenticated user.",
 )
 def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     """Return the current user's profile."""
@@ -158,7 +188,6 @@ def refresh(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Exchange refresh token for a new access token and rotated refresh token."""
-    from datetime import datetime, timezone
     from app.models.user_session import UserSession
     from app.core.security import hash_token
 
@@ -220,84 +249,205 @@ def logout(
     return {"status": "success", "message": "Successfully logged out"}
 
 
-# ── POST /auth/2fa/add-phone ──────────────────────────────────────────────────
+# ── POST /auth/2fa/enable ──────────────────────────────────────────────────────
 
 @router.post(
-    "/2fa/add-phone",
-    summary="Add a phone number for 2FA setup",
-    description="Registers an Indian phone number for the authenticated user and triggers sending an OTP code.",
+    "/2fa/enable",
+    summary="Trigger Email 2FA setup",
+    description="Generates and dispatches a 6-digit verification code to the authenticated user's email address.",
 )
-def add_phone(
-    body: OTPRequest,
+def enable_2fa(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     from app.services.otp_service import send_otp
-    from app.services.phone_validator import validate_indian_phone
 
-    normalized_phone = validate_indian_phone(body.phone_number)
-
-    # Check if this phone number is already registered by another verified user
-    other_user = db.query(User).filter(
-        User.phone_number == normalized_phone,
-        User.is_phone_verified == True,
-        User.id != current_user.id
-    ).first()
-    if other_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Phone number already registered by another account.",
-        )
-
-    # Save phone number to current user (even if not verified yet)
-    current_user.phone_number = normalized_phone
-    current_user.is_phone_verified = False
-    db.commit()
-
-    # Trigger sending OTP
-    send_otp(db, normalized_phone)
+    # Trigger sending OTP to user's registered email
+    send_otp(db, current_user.email)
 
     return {
         "status": "success",
-        "message": "Verification OTP sent to your phone number.",
-        "phone_number": normalized_phone
+        "message": f"Verification OTP sent to your registered email address: {mask_email(current_user.email)}",
+        "email": mask_email(current_user.email)
     }
 
 
-# ── POST /auth/2fa/confirm-phone ──────────────────────────────────────────────
+# ── POST /auth/2fa/confirm ─────────────────────────────────────────────────────
 
 @router.post(
-    "/2fa/confirm-phone",
-    summary="Confirm phone number with OTP",
-    description="Verifies the OTP code submitted by the user to activate 2FA.",
+    "/2fa/confirm",
+    summary="Confirm OTP and enable Email 2FA",
+    description="Verifies the OTP code submitted by the user. On success, activates Email 2FA on the account.",
 )
-def confirm_phone(
-    body: OTPVerifyRequest,
+def confirm_2fa(
+    body: Email2FAConfirmRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     from app.services.otp_service import verify_otp
-    from app.services.phone_validator import validate_indian_phone
 
-    normalized_phone = validate_indian_phone(body.phone_number)
+    # Verify OTP code against registered email
+    verify_otp(db, current_user.email, body.otp_code)
 
-    # Ensure the user is verifying their own registered phone number
-    if current_user.phone_number != normalized_phone:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Submitted phone number does not match your registered phone number. Please run add-phone first.",
-        )
-
-    # Verify OTP code
-    verify_otp(db, normalized_phone, body.otp_code)
-
-    # Mark user phone as verified
-    current_user.is_phone_verified = True
+    # Activate 2FA on the account
+    current_user.is_2fa_enabled = True
     db.commit()
 
     return {
         "status": "success",
-        "message": "Phone number successfully verified. Two-factor authentication (2FA) is now active."
+        "message": "Two-factor authentication (2FA) is now active on your account."
     }
 
 
+# ── POST /auth/2fa/disable ─────────────────────────────────────────────────────
+
+@router.post(
+    "/2fa/disable",
+    summary="Disable Email 2FA",
+    description="Disables Email 2FA on the authenticated user's account.",
+)
+def disable_2fa(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.is_2fa_enabled = False
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Two-factor authentication (2FA) has been disabled on your account."
+    }
+
+
+# ── POST /auth/2fa/login-verify ───────────────────────────────────────────────
+
+@router.post(
+    "/2fa/login-verify",
+    response_model=TokenResponse,
+    summary="Verify 2FA OTP at login",
+    description="Accepts a pending 2FA token and 6-digit OTP code. If valid, establishes session and returns access + refresh tokens.",
+)
+def login_verify_2fa(
+    body: LoginVerify2FARequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    from app.core.security import decode_access_token
+    from app.services.otp_service import verify_otp
+
+    # 1. Decode and validate the pending 2FA token
+    payload = decode_access_token(body.pending_2fa_token)
+    if not payload or not payload.get("pending_2fa"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    # 2. Query user and check status
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    if not user.is_2fa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is not active on this account.",
+        )
+
+    # 3. Verify OTP
+    verify_otp(db, user.email, body.otp_code)
+
+    # 4. Success! Issue real session and tokens
+    ip_address = request.client.host if request.client else None
+    device_info = request.headers.get("user-agent")
+
+    refresh_token, session_id = create_refresh_token(
+        user_id=user.id,
+        db=db,
+        device_info=device_info,
+        ip_address=ip_address,
+    )
+    access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
+
+
+# ── POST /auth/2fa/resend-otp ─────────────────────────────────────────────────
+
+@router.post(
+    "/2fa/resend-otp",
+    summary="Resend 2FA OTP at login",
+    description="Resends the verification OTP code for a user in the pending 2FA state, with a 30-second cooldown.",
+)
+def resend_2fa_otp(
+    body: Resend2FAOTPRequest,
+    db: Session = Depends(get_db),
+):
+    from app.core.security import decode_access_token
+    from app.services.otp_service import send_otp
+    from app.models.email_otp import EmailOTPVerification
+
+    # 1. Decode and validate the pending 2FA token
+    payload = decode_access_token(body.pending_2fa_token)
+    if not payload or not payload.get("pending_2fa"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    # 2. Query user and check status
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired 2FA session. Please log in again.",
+        )
+
+    if not user.is_2fa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is not active on this account.",
+        )
+
+    # 3. Cooldown check (30 seconds)
+    otp_entry = db.query(EmailOTPVerification).filter(
+        EmailOTPVerification.email == user.email
+    ).first()
+    if otp_entry:
+        now = datetime.now(timezone.utc)
+        time_elapsed = now - otp_entry.created_at
+        if time_elapsed < timedelta(seconds=30):
+            seconds_left = int(30 - time_elapsed.total_seconds())
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {seconds_left} seconds before requesting a new OTP.",
+            )
+
+    # 4. Trigger sending OTP
+    send_otp(db, user.email)
+
+    return {
+        "status": "success",
+        "message": f"Code sent to {mask_email(user.email)}"
+    }

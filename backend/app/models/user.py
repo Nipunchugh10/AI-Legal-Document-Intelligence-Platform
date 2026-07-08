@@ -23,10 +23,7 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    phone_number: Mapped[str | None] = mapped_column(
-        String(20), unique=True, index=True, nullable=True
-    )
-    is_phone_verified: Mapped[bool] = mapped_column(
+    is_2fa_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
