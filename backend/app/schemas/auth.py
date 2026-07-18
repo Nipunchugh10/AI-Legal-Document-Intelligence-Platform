@@ -35,6 +35,12 @@ class LoginRequest(BaseModel):
     model_config = {"json_schema_extra": {"example": {"email": "user@example.com", "password": "secret123"}}}
 
 
+class GoogleLoginRequest(BaseModel):
+    """Body for POST /auth/google-login"""
+
+    credential: str = Field(..., description="Google ID Token (credential) returned by Google Identity Services")
+
+
 class RefreshRequest(BaseModel):
     """Body for POST /auth/refresh"""
 
