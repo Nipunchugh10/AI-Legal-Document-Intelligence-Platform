@@ -526,7 +526,7 @@ user_sessions
 
 ---
 
-### Day 16 — PDF Text Extraction
+### Day 16 — PDF Text Extraction (Completed)
 
 **Goal:** Extract raw text from uploaded PDFs.
 

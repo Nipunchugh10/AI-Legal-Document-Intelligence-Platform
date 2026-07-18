@@ -21,7 +21,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.contract import Contract
 from app.models.user import User
-from app.schemas.contract import ContractResponse
+from app.schemas.contract import ContractResponse, TextExtractionResponse
 
 router = APIRouter()
 settings = get_settings()
@@ -148,3 +148,84 @@ async def get_contract(
             detail="Contract not found or not owned by user.",
         )
     return contract
+
+
+# ── POST /contracts/{contract_id}/extract ──────────────────────────────────────
+
+@router.post(
+    "/{contract_id}/extract",
+    response_model=TextExtractionResponse,
+    summary="Extract text from contract PDF",
+    description="Extracts raw text from the uploaded contract PDF and stores it in the analyses table.",
+)
+async def extract_contract_text(
+    contract_id: int,
+    strategy: str = "pymupdf",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.pdf_extractor import extract_pdf_text
+    from app.models.analysis import Analysis
+
+    # 1. Fetch contract
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 2. Validate strategy query parameter
+    if strategy not in ["pymupdf", "pdfplumber"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid strategy. Allowed options: 'pymupdf', 'pdfplumber'.",
+        )
+
+    # 3. Perform text extraction
+    extracted = extract_pdf_text(contract.upload_path, strategy=strategy)
+
+    # 4. Check if there is an existing raw_text analysis for this contract
+    analysis = (
+        db.query(Analysis)
+        .filter(
+            Analysis.contract_id == contract.id,
+            Analysis.analysis_type == "raw_text",
+        )
+        .first()
+    )
+
+    result_json = {
+        "text": extracted["text"],
+        "page_count": extracted["page_count"],
+        "is_scanned": extracted["is_scanned"],
+        "strategy": extracted["strategy"],
+    }
+
+    if analysis:
+        # Update existing record
+        analysis.result_json = result_json
+    else:
+        # Create new record
+        analysis = Analysis(
+            contract_id=contract.id,
+            analysis_type="raw_text",
+            result_json=result_json,
+        )
+        db.add(analysis)
+
+    # 5. Update contract status to 'ingested'
+    contract.status = "ingested"
+    db.commit()
+
+    return TextExtractionResponse(
+        contract_id=contract.id,
+        page_count=extracted["page_count"],
+        is_scanned=extracted["is_scanned"],
+        strategy=extracted["strategy"],
+        text=extracted["text"],
+    )

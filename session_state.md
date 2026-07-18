@@ -19,7 +19,7 @@ This ledger serves as the single source of truth for tracking daily progress, se
 | :--- | :---: | :--- | :---: | :---: |
 | **Phase 1 — Foundation & Project Setup** | 1–7 | Repo, FastAPI, DB Models, JWT Auth, Docker | ✅ Complete | `100%` |
 | **Phase 2A — Identity, Sessions, and Email-Based 2FA** | 8–15 | Email OTP Auth, Session Expiry, Auto-logout | ✅ Complete | `100%` |
-| **Phase 2B — Document Parsing Agent** | 16–22 | PDF Extraction, Chunking, Embeddings, LangGraph Agents 1–2 | ⏳ Pending | `0%` |
+| **Phase 2B — Document Parsing Agent** | 16–22 | PDF Extraction, Chunking, Embeddings, LangGraph Agents 1–2 | 🔨 In Progress | `14%` |
 | **Phase 3 — Risk and Compliance Agents** | 23–29 | Agents 3–5, RAG Knowledge Base, Orchestration, Observability | ⏳ Pending | `0%` |
 | **Phase 4 — Frontend Development** | 30–39 | Dashboard, Viewer, Risk Panels, Q&A Chat, Comparison UI | ⏳ Pending | `0%` |
 | **Phase 5 — Contract Memory and Search** | 40–44 | Semantic Search, Async Pipeline, AI Stack Resilience | ⏳ Pending | `0%` |
@@ -461,6 +461,26 @@ This ledger serves as the single source of truth for tracking daily progress, se
   - `.env`
 - **Deliverable:** ✅ Day 15 is complete. Users can authenticate with Google (bypassing 2FA), monitor active device sessions, and log out/revoke other active devices from the security dashboard. Phase 2A is 100% complete and fully verified.
 
+### Day 16 — PDF Text Extraction (2026-07-19) ✅
+> **Goal:** Extract raw text from uploaded contract PDFs using multiple strategies and detect scanned documents.
+- **Achievements:**
+  - Installed `pymupdf` and `pdfplumber` libraries in the backend environment and added them to `requirements.txt`.
+  - Created `backend/app/services/pdf_extractor.py` containing:
+    - `extract_with_pymupdf`: high-performance text parsing.
+    - `extract_with_pdfplumber`: table-aware and column-structured extraction.
+    - `extract_pdf_text`: main entry point combining character density logic to auto-flag scanned PDFs.
+  - Implemented schema `TextExtractionResponse` in `backend/app/schemas/contract.py`.
+  - Created the API endpoint `POST /contracts/{contract_id}/extract` in `backend/app/api/contracts.py` that processes the PDF, registers a `raw_text` analysis record in `analyses` using JSONB, and updates the contract status to `ingested`.
+  - Wrote a self-contained integration test suite in `backend/tests/test_pdf_extractor.py` verifying all extraction strategies, scanned PDF detection, and endpoint behavior.
+- **Files Created:**
+  - `backend/app/services/pdf_extractor.py`
+  - `backend/tests/test_pdf_extractor.py`
+- **Files Modified:**
+  - `backend/requirements.txt`
+  - `backend/app/schemas/contract.py`
+  - `backend/app/api/contracts.py`
+- **Deliverable:** ✅ Users can upload a contract PDF, trigger the extraction endpoint, and receive structured plain text and page metadata back, with the document transition status marked as `ingested`.
+
 ---
 
 ## ⚙️ Project Environment & Configuration State
@@ -480,6 +500,7 @@ This ledger serves as the single source of truth for tracking daily progress, se
   - python-jose 3.3.0, passlib 1.7.4, **bcrypt 4.2.1** (pinned — 5.x incompatible with passlib)
   - python-multipart 0.0.12, email-validator 2.3.0
   - **google-generativeai 0.8.6** ✅
+  - **pymupdf 1.24.10**, **pdfplumber 0.11.4** ✅
 - **Environment Variables State (`.env`):**
   - `DATABASE_URL`: `postgresql://postgres:postgres@localhost:5432/legal_ai_db` ✅
   - `JWT_SECRET_KEY`: `cryptographically secure 256-bit key` (set)

@@ -21,3 +21,13 @@ class ContractResponse(BaseModel):
     created_at: datetime = Field(..., description="Timestamp of when the contract was uploaded")
 
     model_config = {"from_attributes": True}
+
+
+class TextExtractionResponse(BaseModel):
+    """Returned when a contract's text is successfully extracted."""
+
+    contract_id: int
+    page_count: int
+    is_scanned: bool
+    strategy: str
+    text: str
