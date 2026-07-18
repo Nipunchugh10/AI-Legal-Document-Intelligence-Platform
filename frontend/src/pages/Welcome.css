@@ -1,0 +1,242 @@
+/* --- Welcome Page CSS --- */
+.welcome-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+  position: relative;
+}
+
+.welcome-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 8%;
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: var(--backdrop-blur);
+  background: var(--color-surface-card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.welcome-brand {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-main);
+  letter-spacing: -0.03em;
+}
+
+.welcome-brand span {
+  color: var(--color-primary);
+}
+
+.welcome-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.theme-toggle-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-main);
+  transition: all var(--transition-fast);
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
+
+.welcome-hero {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 60px;
+  padding: 80px 8%;
+  max-width: 1400px;
+  margin: 0 auto;
+  align-items: center;
+  flex: 1;
+}
+
+@media (max-width: 968px) {
+  .welcome-hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding: 40px 6%;
+    text-align: center;
+  }
+
+  .welcome-nav-actions {
+    gap: 8px;
+  }
+}
+
+.welcome-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.welcome-headline {
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-text-main);
+}
+
+.welcome-headline span {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.welcome-subhead {
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.welcome-cta-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+@media (max-width: 968px) {
+  .welcome-cta-group {
+    justify-content: center;
+  }
+}
+
+.welcome-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.welcome-btn-primary:hover {
+  background: var(--color-primary-hover);
+  box-shadow: 0 8px 20px rgba(92, 98, 236, 0.3);
+}
+
+.welcome-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-text-main);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.welcome-btn-secondary:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
+
+.welcome-features {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  text-align: left;
+}
+
+.welcome-feature-card {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.welcome-feature-card:hover {
+  border-color: var(--color-border-hover);
+  transform: translateY(-4px);
+}
+
+.welcome-feature-icon {
+  font-size: 1.75rem;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.welcome-feature-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--color-text-main);
+}
+
+.welcome-feature-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.welcome-hero-right {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.welcome-hero-image-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+}
+
+.welcome-hero-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform var(--transition-slow);
+}
+
+.welcome-hero-image-wrapper:hover .welcome-hero-image {
+  transform: scale(1.03);
+}
+
+.welcome-hero-glow {
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(circle, var(--color-primary-glow) 0%, transparent 60%);
+  z-index: -1;
+  pointer-events: none;
+}
