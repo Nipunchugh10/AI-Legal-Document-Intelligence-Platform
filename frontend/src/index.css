@@ -861,4 +861,83 @@ a:hover {
   margin-bottom: 10px;
 }
 
+/* --- Active Sessions Styles --- */
+.sessions-section {
+  margin-top: 40px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 30px;
+}
+
+.sessions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sessions-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.session-item:hover {
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-device {
+  font-size: 0.925rem;
+  font-weight: 500;
+  color: var(--color-text-main);
+}
+
+.session-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-tag-current {
+  background: rgba(92, 98, 236, 0.15);
+  color: var(--color-primary);
+  font-size: 0.725rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(92, 98, 236, 0.25);
+  letter-spacing: 0.02em;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+}
+
 

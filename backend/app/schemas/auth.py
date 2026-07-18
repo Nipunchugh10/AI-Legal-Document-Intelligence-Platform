@@ -115,3 +115,16 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserSessionResponse(BaseModel):
+    """Schema representing an active user device session."""
+
+    id: int
+    device_info: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    last_active_at: datetime
+    is_current: bool = False
+
+    model_config = {"from_attributes": True}
