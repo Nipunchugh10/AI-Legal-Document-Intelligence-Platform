@@ -77,7 +77,7 @@ def register(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
+            detail="Registration cannot be completed with these credentials. Please check your inputs or try logging in if you already have an account.",
         )
 
     # Create and persist the new user
