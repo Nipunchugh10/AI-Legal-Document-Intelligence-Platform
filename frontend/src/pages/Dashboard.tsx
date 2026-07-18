@@ -119,7 +119,11 @@ export const Dashboard: React.FC = () => {
     <div className="app-container">
       {/* Navbar Component */}
       <header className="navbar">
-        <div className="navbar-brand">
+        <div
+          onClick={() => navigate("/dashboard")}
+          className="navbar-brand"
+          style={{ cursor: "pointer" }}
+        >
           Legal<span>Intelligence</span>
         </div>
         <div className="navbar-actions">

@@ -298,8 +298,18 @@ export const Login: React.FC = () => {
   // Render 2FA verification panel
   if (requires2fa) {
     return (
-      <div className="auth-container">
-        <div className="glass-panel auth-card">
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <header className="navbar">
+          <div
+            onClick={() => navigate("/")}
+            className="navbar-brand"
+            style={{ cursor: "pointer" }}
+          >
+            Legal<span>Intelligence</span>
+          </div>
+        </header>
+        <div className="auth-container" style={{ flex: 1 }}>
+          <div className="glass-panel auth-card">
           <h2 className="auth-title">Enter Verification Code</h2>
           <p className="auth-subtitle">{maskedMessage}</p>
 
@@ -378,13 +388,24 @@ export const Login: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
     );
   }
 
   // Render standard login form
   return (
-    <div className="auth-container">
-      <div className="glass-panel auth-card">
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <header className="navbar">
+        <div
+          onClick={() => navigate("/")}
+          className="navbar-brand"
+          style={{ cursor: "pointer" }}
+        >
+          Legal<span>Intelligence</span>
+        </div>
+      </header>
+      <div className="auth-container" style={{ flex: 1 }}>
+        <div className="glass-panel auth-card">
         <h2 className="auth-title">Welcome Back</h2>
         <p className="auth-subtitle">Log in to review and analyze your contracts</p>
 
@@ -468,5 +489,6 @@ export const Login: React.FC = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };

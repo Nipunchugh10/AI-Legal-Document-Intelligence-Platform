@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store/useAuthStore";
 import "./Welcome.css";
 
 export const Welcome: React.FC = () => {
+  const navigate = useNavigate();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     return (localStorage.getItem("theme") as "dark" | "light") || "dark";
   });
@@ -25,7 +29,11 @@ export const Welcome: React.FC = () => {
     <div className="welcome-container">
       {/* Navbar section */}
       <header className="welcome-navbar">
-        <div className="welcome-brand">
+        <div
+          onClick={() => navigate(isAuthenticated ? "/dashboard" : "/")}
+          className="welcome-brand"
+          style={{ cursor: "pointer" }}
+        >
           Legal<span>Intelligence</span>
         </div>
         <div className="welcome-nav-actions">

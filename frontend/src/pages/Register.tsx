@@ -156,8 +156,18 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="glass-panel auth-card">
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <header className="navbar">
+        <div
+          onClick={() => navigate("/")}
+          className="navbar-brand"
+          style={{ cursor: "pointer" }}
+        >
+          Legal<span>Intelligence</span>
+        </div>
+      </header>
+      <div className="auth-container" style={{ flex: 1 }}>
+        <div className="glass-panel auth-card">
         <h2 className="auth-title">Create Account</h2>
         <p className="auth-subtitle">Get started with automated contract analysis</p>
 
@@ -267,5 +277,6 @@ export const Register: React.FC = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
