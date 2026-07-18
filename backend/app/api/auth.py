@@ -25,6 +25,7 @@ from app.core.security import (
     get_current_user,
     hash_password,
     verify_password,
+    oauth2_scheme,
 )
 from app.models.user import User
 from app.schemas.auth import (
@@ -37,6 +38,7 @@ from app.schemas.auth import (
     LoginVerify2FARequest,
     Resend2FAOTPRequest,
     GoogleLoginRequest,
+    UserSessionResponse,
 )
 
 router = APIRouter()
@@ -534,10 +536,132 @@ def google_login(
         ip_address=ip_address,
     )
     access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
-
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
         requires_2fa=False,
     )
+
+
+# ── GET /auth/sessions ─────────────────────────────────────────────────────────
+
+@router.get(
+    "/sessions",
+    response_model=list[UserSessionResponse],
+    summary="List all active user sessions",
+    description="Returns a list of all active, unrevoked device sessions for the authenticated user.",
+)
+def get_active_sessions(
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> list[UserSessionResponse]:
+    """Retrieve active device sessions for the current authenticated user."""
+    from app.models.user_session import UserSession
+    from app.core.security import decode_access_token
+
+    # Decode token to identify which session is the current one
+    payload = decode_access_token(token)
+    current_session_id = payload.get("session_id") if payload else None
+
+    # Fetch active, non-expired sessions
+    now = datetime.now(timezone.utc)
+    sessions = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == current_user.id,
+            UserSession.is_revoked == False,
+            UserSession.expires_at > now,
+        )
+        .order_by(UserSession.last_active_at.desc())
+        .all()
+    )
+
+    # Convert to schema list and tag the current session
+    response_sessions = []
+    for s in sessions:
+        response_sessions.append(
+            UserSessionResponse(
+                id=s.id,
+                device_info=s.device_info,
+                ip_address=s.ip_address,
+                created_at=s.created_at,
+                last_active_at=s.last_active_at,
+                is_current=(s.id == current_session_id),
+            )
+        )
+
+    return response_sessions
+
+
+# ── DELETE /auth/sessions ──────────────────────────────────────────────────────
+
+@router.delete(
+    "/sessions",
+    summary="Revoke other active sessions",
+    description="Revokes all other active device sessions (logs out all other devices) for the authenticated user.",
+)
+def revoke_other_sessions(
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    """Revoke all active user sessions except the current one."""
+    from app.models.user_session import UserSession
+    from app.core.security import decode_access_token
+
+    payload = decode_access_token(token)
+    current_session_id = payload.get("session_id") if payload else None
+
+    if not current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session context missing",
+        )
+
+    # Mark all other sessions as revoked
+    db.query(UserSession).filter(
+        UserSession.user_id == current_user.id,
+        UserSession.id != current_session_id,
+        UserSession.is_revoked == False,
+    ).update({UserSession.is_revoked: True}, synchronize_session=False)
+    db.commit()
+
+    return {"status": "success", "message": "All other sessions successfully revoked."}
+
+
+# ── DELETE /auth/sessions/{session_id} ──────────────────────────────────────────
+
+@router.delete(
+    "/sessions/{session_id}",
+    summary="Revoke a specific session",
+    description="Revokes a specific device session by ID. If current session is revoked, the user is logged out.",
+)
+def revoke_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Revoke a specific active device session."""
+    from app.models.user_session import UserSession
+
+    session = (
+        db.query(UserSession)
+        .filter(UserSession.id == session_id, UserSession.user_id == current_user.id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or unauthorized.",
+        )
+
+    if session.is_revoked:
+        return {"status": "success", "message": "Session was already revoked."}
+
+    session.is_revoked = True
+    db.commit()
+
+    return {"status": "success", "message": "Session successfully revoked."}

@@ -18,6 +18,74 @@ export const Security: React.FC = () => {
   const [otpExpirySeconds, setOtpExpirySeconds] = useState(300); // 5 minutes
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Active Sessions State
+  interface DeviceSession {
+    id: number;
+    device_info: string | null;
+    ip_address: string | null;
+    created_at: string;
+    last_active_at: string;
+    is_current: boolean;
+  }
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
+  const fetchSessions = async () => {
+    setIsLoadingSessions(true);
+    try {
+      const res = await api.get<DeviceSession[]>("/auth/sessions");
+      setSessions(res.data);
+    } catch (err) {
+      console.error("Failed to load active sessions", err);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  const handleRevokeSession = async (sessionId: number, isCurrent: boolean) => {
+    if (isCurrent) {
+      if (!window.confirm("Logging out of your current session will log you out of the application. Proceed?")) {
+        return;
+      }
+    } else {
+      if (!window.confirm("Are you sure you want to terminate this session?")) {
+        return;
+      }
+    }
+
+    try {
+      await api.delete(`/auth/sessions/${sessionId}`);
+      if (isCurrent) {
+        const logout = useAuthStore.getState().logout;
+        await logout();
+        navigate("/login?expired=true");
+      } else {
+        setSuccessMsg("Device session successfully terminated.");
+        fetchSessions();
+      }
+    } catch (err: any) {
+      setErrorMsg("Failed to revoke session.");
+    }
+  };
+
+  const handleRevokeOthers = async () => {
+    if (!window.confirm("Are you sure you want to log out of all other devices?")) {
+      return;
+    }
+
+    try {
+      await api.delete("/auth/sessions");
+      setSuccessMsg("Logged out of all other devices successfully.");
+      fetchSessions();
+    } catch (err) {
+      setErrorMsg("Failed to revoke other sessions.");
+    }
+  };
+
   // Reset digits when transition to verify
   useEffect(() => {
     if (step === "verify") {
@@ -318,6 +386,60 @@ export const Security: React.FC = () => {
               </div>
             </div>
           )}
+
+        {/* ACTIVE SESSIONS PANEL */}
+        <div className="sessions-section">
+          <div className="sessions-header">
+            <h3 className="sessions-title">Active Device Sessions</h3>
+            {sessions.length > 1 && (
+              <button
+                onClick={handleRevokeOthers}
+                className="btn btn-secondary btn-nav-action"
+                style={{ color: "var(--color-danger)", borderColor: "rgba(244, 63, 94, 0.2)" }}
+              >
+                Log Out Other Devices
+              </button>
+            )}
+          </div>
+
+          {isLoadingSessions ? (
+            <div className="flex-center-pt10" style={{ paddingTop: "20px" }}>
+              <div className="spinner spinner-sm" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <p className="text-muted-sm">No active sessions found.</p>
+          ) : (
+            <div className="sessions-list">
+              {sessions.map((s) => (
+                <div key={s.id} className="session-item">
+                  <div className="session-info">
+                    <div className="session-device">
+                      {s.device_info || "Unknown Device / Browser"}
+                    </div>
+                    <div className="session-meta">
+                      <span>IP: {s.ip_address || "Unknown"}</span>
+                      <span>•</span>
+                      <span>
+                        Last active: {new Date(s.last_active_at).toLocaleString()}
+                      </span>
+                      {s.is_current && (
+                        <span className="session-tag-current">This Device</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="session-actions">
+                    <button
+                      onClick={() => handleRevokeSession(s.id, s.is_current)}
+                      className="btn btn-secondary btn-table-action btn-danger-outline"
+                    >
+                      {s.is_current ? "Log Out" : "Revoke"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         </div>
       </main>
