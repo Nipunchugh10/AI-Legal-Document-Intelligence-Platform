@@ -36,6 +36,7 @@ from app.schemas.auth import (
     Email2FAConfirmRequest,
     LoginVerify2FARequest,
     Resend2FAOTPRequest,
+    GoogleLoginRequest,
 )
 
 router = APIRouter()
@@ -451,3 +452,92 @@ def resend_2fa_otp(
         "status": "success",
         "message": f"Code sent to {mask_email(user.email)}"
     }
+
+
+# ── POST /auth/google-login ────────────────────────────────────────────────────
+
+@router.post(
+    "/google-login",
+    response_model=TokenResponse,
+    summary="Sign in or register with Google OAuth credentials",
+    description=(
+        "Verifies the Google OAuth ID Token (credential). If the user is new, automatically "
+        "registers them. Returns active access and refresh tokens. Bypasses 2FA checks entirely."
+    ),
+)
+def google_login(
+    body: GoogleLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Authenticate a user using Google OAuth ID Token."""
+    import secrets
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+    from app.core.config import get_settings
+
+    settings = get_settings()
+
+    # 1. Verify Google Credential Token
+    try:
+        id_info = id_token.verify_oauth2_token(
+            body.credential,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credential token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Extract user information
+    email = id_info.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google account does not provide an email address",
+        )
+
+    # Normalize email
+    email_normalized = email.strip().lower()
+
+    # 3. Check if user exists or register automatically
+    user = db.query(User).filter(User.email == email_normalized).first()
+    if not user:
+        # Create and persist a new user with random password
+        user = User(
+            email=email_normalized,
+            hashed_password=hash_password(secrets.token_hex(16)),
+            is_active=True,
+            is_2fa_enabled=False,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is inactive",
+            )
+
+    # 4. Success! Issue active session credentials directly, bypassing 2FA OTP prompt completely
+    ip_address = request.client.host if request.client else None
+    device_info = request.headers.get("user-agent")
+
+    refresh_token, session_id = create_refresh_token(
+        user_id=user.id,
+        db=db,
+        device_info=device_info,
+        ip_address=ip_address,
+    )
+    access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        requires_2fa=False,
+    )

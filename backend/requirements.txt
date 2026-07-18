@@ -28,3 +28,6 @@ python-multipart==0.0.12
 
 # --- AI / LLM ---
 google-generativeai>=0.8.0
+
+# --- Google OAuth Verification ---
+google-auth==2.35.0
