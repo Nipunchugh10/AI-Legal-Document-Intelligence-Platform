@@ -244,7 +244,7 @@ export const Register: React.FC = () => {
               {...register("confirmPassword", {
                 required: "Please confirm your password",
                 validate: (value) =>
-                  value === passwordVal || "Passwords do not match",
+                  value === passwordVal || "Passwords do not match. Please verify that both password fields are identical.",
               })}
             />
             {errors.confirmPassword && (
