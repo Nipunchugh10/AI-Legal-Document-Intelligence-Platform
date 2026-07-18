@@ -31,3 +31,7 @@ google-generativeai>=0.8.0
 
 # --- Google OAuth Verification ---
 google-auth==2.35.0
+
+# --- PDF Processing (Day 16) ---
+pymupdf==1.24.10
+pdfplumber==0.11.4
