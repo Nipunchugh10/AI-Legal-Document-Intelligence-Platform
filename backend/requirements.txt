@@ -35,3 +35,10 @@ google-auth==2.35.0
 # --- PDF Processing (Day 16) ---
 pymupdf==1.24.10
 pdfplumber==0.11.4
+
+# --- Text Chunking (Day 17) ---
+langchain-text-splitters>=0.2.0
+tiktoken>=0.7.0
+
+# --- Vector Database (Day 18) ---
+chromadb>=0.5.0

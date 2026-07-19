@@ -85,7 +85,10 @@ def run_tests():
     print(f"[+] Contract uploaded successfully: ID {contract_id}, Filename: {contract_data['filename']}")
     assert contract_data["filename"] == "employment_agreement.pdf"
     assert contract_data["status"] == "pending"
-    assert os.path.exists(contract_data["upload_path"]), "Uploaded file does not exist on disk!"
+    upload_path = contract_data["upload_path"]
+    if not os.path.exists(upload_path):
+        upload_path = os.path.join("backend", upload_path)
+    assert os.path.exists(upload_path), f"Uploaded file does not exist on disk! Checked: {contract_data['upload_path']} and {upload_path}"
 
     # 5. Test File Size Limit (Upload dummy file > 10MB)
     print("[*] Testing file size validation (uploading large 11MB file)...")
@@ -139,10 +142,21 @@ def run_tests():
     assert bad_detail.status_code == 404, f"Expected 404 Not Found for unauthorized lookup, got {bad_detail.status_code}: {bad_detail.text}"
     print("[+] Data isolation verified: Second user cannot see first user's contract details.")
 
-    # Clean up the uploaded dummy contract file
-    if os.path.exists(contract_data["upload_path"]):
-        os.remove(contract_data["upload_path"])
-        print("[+] Cleaned up local test file.")
+    # 9. Test Delete Contract
+    print(f"[*] Testing contract deletion for ID {contract_id}...")
+    delete_response = requests.delete(f"{BASE_URL}/contracts/{contract_id}", headers=headers)
+    assert delete_response.status_code == 200, f"Delete failed: {delete_response.text}"
+    assert delete_response.json()["status"] == "success"
+    print(f"[+] Contract deleted successfully via endpoint.")
+
+    # Confirm it is no longer retrievable
+    check_delete = requests.get(f"{BASE_URL}/contracts/{contract_id}", headers=headers)
+    assert check_delete.status_code == 404
+    print("[+] Contract verified as missing in database.")
+
+    # Confirm file on disk is deleted
+    assert not os.path.exists(upload_path), "Contract file was not deleted from disk!"
+    print("[+] Contract file verified as deleted from disk.")
 
     print("\n" + "=" * 60)
     print(" ALL TESTS PASSED SUCCESSFULLY! [OK]")

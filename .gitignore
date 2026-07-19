@@ -40,5 +40,14 @@ chroma_data/
 # Session state (private development notes)
 session_state.md
 
-# Plan (private development notes) 
+# Plan (private development notes)
 PLAN.md
+Sample_Freelance_Agreement_TEST.pdf
+
+# Local Uploads and Temp Databases
+backend/uploads/*
+!backend/uploads/.gitkeep
+test_chroma_data/
+test_ingestion_chroma/
+desktop.ini
+
