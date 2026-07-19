@@ -90,6 +90,23 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteContract = async (contractId: number) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this contract? This will permanently remove the contract, all analyses, and its vector embeddings."
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(`/contracts/${contractId}`);
+      fetchContracts(); // refresh list
+    } catch (err) {
+      console.error("Failed to delete contract:", err);
+      alert("Failed to delete contract. Please try again.");
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString("en-IN", {
@@ -188,12 +205,20 @@ export const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td>
-                          <button 
-                            className="btn btn-secondary btn-table-action" 
-                            onClick={() => alert(`Day 16+ parsing details will open contract ${contract.id}`)}
-                          >
-                            View Analysis
-                          </button>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button 
+                              className="btn btn-secondary btn-table-action" 
+                              onClick={() => alert(`Day 16+ parsing details will open contract ${contract.id}`)}
+                            >
+                              View Analysis
+                            </button>
+                            <button 
+                              className="btn btn-danger-outline btn-table-action" 
+                              onClick={() => handleDeleteContract(contract.id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

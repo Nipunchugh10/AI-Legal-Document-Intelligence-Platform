@@ -31,3 +31,12 @@ class TextExtractionResponse(BaseModel):
     is_scanned: bool
     strategy: str
     text: str
+
+
+class ChunkingResponse(BaseModel):
+    """Returned when a contract's text is successfully chunked."""
+
+    contract_id: int
+    chunk_count: int
+    chunks: list[str]
+

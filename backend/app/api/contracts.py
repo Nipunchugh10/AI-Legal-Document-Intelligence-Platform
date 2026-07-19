@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -21,7 +21,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.contract import Contract
 from app.models.user import User
-from app.schemas.contract import ContractResponse, TextExtractionResponse
+from app.schemas.contract import ContractResponse, TextExtractionResponse, ChunkingResponse
 
 router = APIRouter()
 settings = get_settings()
@@ -229,3 +229,230 @@ async def extract_contract_text(
         strategy=extracted["strategy"],
         text=extracted["text"],
     )
+
+
+# ── POST /contracts/{contract_id}/chunk ─────────────────────────────────────────
+
+@router.post(
+    "/{contract_id}/chunk",
+    response_model=ChunkingResponse,
+    summary="Chunk extracted contract text",
+    description="Loads the raw extracted text of a contract, normalizes and preprocesses it, splits it into tokens of specified chunk size/overlap, and stores the chunks in the analyses table.",
+)
+async def chunk_contract_text(
+    contract_id: int,
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.chunker import chunk_text
+    from app.models.analysis import Analysis
+
+    # 1. Fetch contract
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 2. Fetch raw text analysis
+    raw_text_analysis = (
+        db.query(Analysis)
+        .filter(
+            Analysis.contract_id == contract.id,
+            Analysis.analysis_type == "raw_text",
+        )
+        .first()
+    )
+    if not raw_text_analysis:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract text must be extracted first (run POST /contracts/{id}/extract).",
+        )
+
+    text = raw_text_analysis.result_json.get("text", "")
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Extracted text is empty.",
+        )
+
+    # 3. Perform chunking
+    try:
+        chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error performing text chunking: {str(e)}",
+        )
+
+    # 4. Save chunks to analyses table
+    analysis = (
+        db.query(Analysis)
+        .filter(
+            Analysis.contract_id == contract.id,
+            Analysis.analysis_type == "chunks",
+        )
+        .first()
+    )
+
+    result_json = {
+        "chunk_count": len(chunks),
+        "chunks": chunks,
+        "chunk_size": chunk_size,
+        "chunk_overlap": chunk_overlap,
+    }
+
+    if analysis:
+        # Update existing record
+        analysis.result_json = result_json
+    else:
+        # Create new record
+        analysis = Analysis(
+            contract_id=contract.id,
+            analysis_type="chunks",
+            result_json=result_json,
+        )
+        db.add(analysis)
+
+    db.commit()
+
+    return ChunkingResponse(
+        contract_id=contract.id,
+        chunk_count=len(chunks),
+        chunks=chunks,
+    )
+
+
+# ── POST /contracts/{contract_id}/ingest ────────────────────────────────────────
+
+@router.post(
+    "/{contract_id}/ingest",
+    response_model=ContractResponse,
+    summary="Ingest contract (PDF -> Chunks -> Embeddings -> Vector DB)",
+    description="Triggers the complete end-to-end ingestion pipeline. By default, it runs in the background. Set background=false to run synchronously.",
+)
+async def ingest_contract_endpoint(
+    contract_id: int,
+    background_tasks: BackgroundTasks,
+    background: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.ingestion_pipeline import ingest_contract
+
+    # 1. Fetch contract
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    if not background:
+        # Run synchronously
+        try:
+            await ingest_contract(contract_id, db)
+            db.refresh(contract)
+            return contract
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ingestion pipeline failed: {str(e)}",
+            )
+
+    # Run in background
+    contract.status = "processing"
+    db.commit()
+
+    def run_ingestion():
+        from app.core.database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            import asyncio
+            asyncio.run(ingest_contract(contract_id, bg_db))
+        except Exception:
+            pass
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(run_ingestion)
+
+    return contract
+
+
+# ── DELETE /contracts/{contract_id} ─────────────────────────────────────────────
+
+@router.delete(
+    "/{contract_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a contract",
+    description="Deletes a contract record from database, its associated analyses, its vector embeddings in ChromaDB, and the raw PDF file from local storage.",
+)
+async def delete_contract(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import os
+    import logging
+    from app.services.vector_store import get_vector_store_service
+
+    logger = logging.getLogger(__name__)
+
+    # 1. Fetch contract and check ownership
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 2. Delete file from local storage
+    if contract.upload_path:
+        file_path = Path(contract.upload_path)
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+                logger.info(f"[+] Deleted local file: {file_path}")
+            except Exception as e:
+                logger.warning(f"[-] Could not delete contract file {file_path}: {e}")
+
+    # 3. Delete embeddings from ChromaDB
+    try:
+        vector_store = get_vector_store_service()
+        vector_store.delete_contract_chunks(contract_id)
+        logger.info(f"[+] Deleted ChromaDB chunks for contract {contract_id}")
+    except Exception as e:
+        logger.warning(f"[-] Could not delete ChromaDB chunks for contract {contract_id}: {e}")
+
+    # 4. Delete contract from PostgreSQL (cascades to analyses)
+    try:
+        db.delete(contract)
+        db.commit()
+        logger.info(f"[+] Deleted contract metadata from database for contract {contract_id}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not delete contract metadata: {str(e)}",
+        )
+
+    return {"status": "success", "message": f"Contract {contract_id} deleted successfully."}
+
+
+
