@@ -21,7 +21,12 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.contract import Contract
 from app.models.user import User
-from app.schemas.contract import ContractResponse, TextExtractionResponse, ChunkingResponse
+from app.schemas.contract import (
+    ContractResponse,
+    TextExtractionResponse,
+    ChunkingResponse,
+    ParsingAgentResponse,
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -453,6 +458,136 @@ async def delete_contract(
         )
 
     return {"status": "success", "message": f"Contract {contract_id} deleted successfully."}
+
+
+# ── POST /contracts/{contract_id}/analyze/parse ─────────────────────────────
+
+@router.post(
+    "/{contract_id}/analyze/parse",
+    response_model=ParsingAgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Run Document Parsing Agent (Agent 1)",
+    description=(
+        "Parses contract text using LangGraph Document Parsing Agent 1 (Gemini LLM) "
+        "to classify document type, extract key parties, effective date, jurisdiction, and executive summary."
+    ),
+)
+async def run_parsing_agent(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.analysis import Analysis
+    from app.services.pdf_extractor import extract_pdf_text
+    from app.agents.parsing_agent import build_parsing_graph
+    from app.agents.base import ContractAnalysisState
+
+    # 1. Fetch contract & check ownership
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 2. Get existing raw text or extract from file
+    raw_text_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
+        .first()
+    )
+
+    if raw_text_record and raw_text_record.result_json and "text" in raw_text_record.result_json:
+        raw_text = raw_text_record.result_json["text"]
+    else:
+        if not contract.upload_path or not Path(contract.upload_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contract file not found on disk to extract text.",
+            )
+        extraction_res = extract_pdf_text(contract.upload_path)
+        raw_text = extraction_res["text"]
+        new_analysis = Analysis(
+            contract_id=contract_id,
+            analysis_type="raw_text",
+            result_json=extraction_res,
+        )
+        db.add(new_analysis)
+        db.commit()
+
+    # 3. Prepare initial state & execute LangGraph parsing graph
+    initial_state: ContractAnalysisState = {
+        "contract_id": contract_id,
+        "raw_text": raw_text,
+        "chunks": [],
+        "document_type": None,
+        "metadata": {},
+        "clauses": {},
+        "risks": [],
+        "compliance_issues": [],
+        "summary": "",
+        "messages": [],
+        "error": None,
+    }
+
+    parsing_graph = build_parsing_graph()
+    final_state = parsing_graph.invoke(initial_state)
+
+    if final_state.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Parsing agent failed: {final_state['error']}",
+        )
+
+    doc_type = final_state.get("document_type", "Legal Document")
+    metadata = final_state.get("metadata", {})
+    party_a = metadata.get("party_a", "Not mentioned")
+    party_b = metadata.get("party_b", "Not mentioned")
+    effective_date = metadata.get("effective_date", "Not mentioned")
+    jurisdiction = metadata.get("jurisdiction", "Not mentioned")
+    summary = final_state.get("summary", "")
+
+    # 4. Save analysis to database
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent")
+        .first()
+    )
+    analysis_payload = {
+        "document_type": doc_type,
+        "party_a": party_a,
+        "party_b": party_b,
+        "effective_date": effective_date,
+        "jurisdiction": jurisdiction,
+        "summary": summary,
+    }
+
+    if analysis_record:
+        analysis_record.result_json = analysis_payload
+    else:
+        analysis_record = Analysis(
+            contract_id=contract_id,
+            analysis_type="parsing_agent",
+            result_json=analysis_payload,
+        )
+        db.add(analysis_record)
+
+    contract.status = "parsed"
+    db.commit()
+
+    return ParsingAgentResponse(
+        contract_id=contract_id,
+        document_type=doc_type,
+        party_a=party_a,
+        party_b=party_b,
+        effective_date=effective_date,
+        jurisdiction=jurisdiction,
+        summary=summary,
+    )
 
 
 

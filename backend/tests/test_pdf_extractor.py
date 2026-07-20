@@ -7,6 +7,7 @@ Creates a real PDF file with text dynamically using PyMuPDF to avoid mock fragil
 
 import sys
 import os
+import pytest
 from datetime import datetime, timezone, timedelta
 
 # Add backend directory to path
@@ -33,6 +34,13 @@ OTHER_EMAIL = "other_pdf_user@gmail.com"
 SAMPLE_PDF_PATH = "test_sample_document.pdf"
 SAMPLE_SCANNED_PDF_PATH = "test_scanned_document.pdf"
 TEST_TEXT = "This is a sample contract text for testing PDF extraction logic. Indemnity and liability clauses."
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_module_test_pdfs():
+    create_test_pdfs()
+    yield
+    cleanup_test_files_and_db()
 
 
 def create_test_pdfs():
