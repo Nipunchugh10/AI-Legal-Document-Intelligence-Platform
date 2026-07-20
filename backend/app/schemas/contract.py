@@ -40,3 +40,16 @@ class ChunkingResponse(BaseModel):
     chunk_count: int
     chunks: list[str]
 
+
+class ParsingAgentResponse(BaseModel):
+    """Returned when a contract is analyzed by the Document Parsing Agent (Agent 1)."""
+
+    contract_id: int
+    document_type: str
+    party_a: str
+    party_b: str
+    effective_date: str
+    jurisdiction: str
+    summary: str
+
+

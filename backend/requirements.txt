@@ -42,3 +42,11 @@ tiktoken>=0.7.0
 
 # --- Vector Database (Day 18) ---
 chromadb>=0.5.0
+
+# --- LangGraph & Agent Pipeline (Day 20) ---
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+tenacity>=8.2.0
+# --- Testing ---
+pytest>=8.0.0

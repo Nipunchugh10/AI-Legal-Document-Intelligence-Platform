@@ -6,6 +6,7 @@ Tests text cleaning and chunking service functions and the POST /contracts/{id}/
 
 import sys
 import os
+import uuid
 from datetime import datetime, timezone, timedelta
 
 # Add backend directory to path
@@ -40,21 +41,24 @@ TEST_TEXT = (
 def cleanup_test_db():
     db = SessionLocal()
     try:
+        db.rollback()
         for email in [TEST_EMAIL, OTHER_EMAIL]:
             user = db.query(User).filter(User.email == email).first()
             if user:
-                db.query(UserSession).filter(UserSession.user_id == user.id).delete()
+                db.query(UserSession).filter(UserSession.user_id == user.id).delete(synchronize_session=False)
                 contracts = db.query(Contract).filter(Contract.user_id == user.id).all()
                 for c in contracts:
-                    db.query(Analysis).filter(Analysis.contract_id == c.id).delete()
-                    if os.path.exists(c.upload_path):
+                    db.query(Analysis).filter(Analysis.contract_id == c.id).delete(synchronize_session=False)
+                    if c.upload_path and os.path.exists(c.upload_path):
                         try:
                             os.remove(c.upload_path)
                         except Exception:
                             pass
-                db.query(Contract).filter(Contract.user_id == user.id).delete()
+                db.query(Contract).filter(Contract.user_id == user.id).delete(synchronize_session=False)
                 db.delete(user)
                 db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
 
@@ -89,7 +93,7 @@ def setup_test_db_and_auth() -> tuple[str, int, int]:
         # Create session
         session = UserSession(
             user_id=user.id,
-            refresh_token_hash="fake_hash",
+            refresh_token_hash=f"fake_hash_chunker_{uuid.uuid4()}",
             device_info="TestClient",
             ip_address="127.0.0.1",
             expires_at=datetime.now(timezone.utc) + timedelta(days=1),
