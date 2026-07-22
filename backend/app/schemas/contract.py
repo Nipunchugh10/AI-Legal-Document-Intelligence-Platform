@@ -53,3 +53,18 @@ class ParsingAgentResponse(BaseModel):
     summary: str
 
 
+class ClauseItem(BaseModel):
+    """A single extracted clause item."""
+
+    text: str = Field(..., description="The exact text of the clause extracted from the contract")
+    location: str = Field(..., description="Approximate location in the document (beginning, middle, end, or Not mentioned)")
+    present: bool = Field(..., description="Whether this clause type was found present in the contract")
+
+
+class ClauseAgentResponse(BaseModel):
+    """Returned when a contract is analyzed by the Clause Detection Agent (Agent 2)."""
+
+    contract_id: int
+    clauses: dict[str, ClauseItem] = Field(..., description="Map of clause_type to its details")
+
+

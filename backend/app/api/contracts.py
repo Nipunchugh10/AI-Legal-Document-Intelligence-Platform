@@ -26,6 +26,7 @@ from app.schemas.contract import (
     TextExtractionResponse,
     ChunkingResponse,
     ParsingAgentResponse,
+    ClauseAgentResponse,
 )
 
 router = APIRouter()
@@ -588,6 +589,118 @@ async def run_parsing_agent(
         jurisdiction=jurisdiction,
         summary=summary,
     )
+
+
+# ── POST /contracts/{contract_id}/analyze/clauses ───────────────────────────
+
+@router.post(
+    "/{contract_id}/analyze/clauses",
+    response_model=ClauseAgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Run Clause Detection Agent (Agent 2)",
+    description=(
+        "Identifies and extracts specific legal clauses using LangGraph Clause Detection Agent 2 (Gemini LLM) "
+        "and RAG vector store chunks. Targets: payment_terms, termination_clauses, liability_clauses, etc."
+    ),
+)
+async def run_clause_agent(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.analysis import Analysis
+    from app.services.pdf_extractor import extract_pdf_text
+    from app.agents.clause_agent import build_clause_graph
+    from app.agents.base import ContractAnalysisState
+
+    # 1. Fetch contract & check ownership
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 2. Get existing raw text or extract from file
+    raw_text_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
+        .first()
+    )
+
+    if raw_text_record and raw_text_record.result_json and "text" in raw_text_record.result_json:
+        raw_text = raw_text_record.result_json["text"]
+    else:
+        if not contract.upload_path or not Path(contract.upload_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contract file not found on disk to extract text.",
+            )
+        extraction_res = extract_pdf_text(contract.upload_path)
+        raw_text = extraction_res["text"]
+        new_analysis = Analysis(
+            contract_id=contract_id,
+            analysis_type="raw_text",
+            result_json=extraction_res,
+        )
+        db.add(new_analysis)
+        db.commit()
+
+    # 3. Prepare initial state & execute LangGraph clause graph
+    initial_state: ContractAnalysisState = {
+        "contract_id": contract_id,
+        "raw_text": raw_text,
+        "chunks": [],
+        "document_type": None,
+        "metadata": {},
+        "clauses": {},
+        "risks": [],
+        "compliance_issues": [],
+        "summary": "",
+        "messages": [],
+        "error": None,
+    }
+
+    clause_graph = build_clause_graph()
+    final_state = clause_graph.invoke(initial_state)
+
+    if final_state.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Clause agent failed: {final_state['error']}",
+        )
+
+    clauses = final_state.get("clauses", {})
+
+    # 4. Save analysis to database
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses")
+        .first()
+    )
+
+    if analysis_record:
+        analysis_record.result_json = clauses
+    else:
+        analysis_record = Analysis(
+            contract_id=contract_id,
+            analysis_type="clauses",
+            result_json=clauses,
+        )
+        db.add(analysis_record)
+
+    contract.status = "analyzed"
+    db.commit()
+
+    return ClauseAgentResponse(
+        contract_id=contract_id,
+        clauses=clauses,
+    )
+
 
 
 
