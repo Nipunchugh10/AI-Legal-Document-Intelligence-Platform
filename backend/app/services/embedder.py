@@ -1,63 +1,58 @@
-import google.generativeai as genai
-from app.core.config import get_settings
+import logging
 from typing import List
+from chromadb.utils import embedding_functions
+
+logger = logging.getLogger(__name__)
 
 class EmbedderService:
-    """Service to handle embedding generation using Google's text-embedding-004 model."""
+    """Service to handle local embedding generation using ChromaDB's default ONNX all-MiniLM-L6-v2 model."""
 
     def __init__(self):
-        self.settings = get_settings()
-        if not self.settings.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY environment variable is not set.")
-        
-        # Configure the generativeai library with the API key
-        genai.configure(api_key=self.settings.GEMINI_API_KEY)
-        # Using gemini-embedding-001 which is the 768-dimensional embedding model supported by our credentials
-        self.model_name = "models/gemini-embedding-001"
+        # Initialize default local embedding function (SentenceTransformer/ONNX all-MiniLM-L6-v2)
+        try:
+            self.ef = embedding_functions.DefaultEmbeddingFunction()
+            logger.info("Successfully initialized local ONNX embedding model.")
+        except Exception as e:
+            logger.error(f"Failed to initialize local ONNX embedding model: {e}")
+            raise RuntimeError(f"Failed to initialize local ONNX embedding model: {e}")
 
     def embed_text(self, text: str) -> List[float]:
         """
-        Generate embedding for a single string.
-        Returns a list of 768 floats.
+        Generate local 384-dimensional embedding for a single string.
         """
         if not text:
-            return [0.0] * 768
+            return [0.0] * 384
             
         try:
-            response = genai.embed_content(
-                model=self.model_name,
-                content=text,
-                task_type="retrieval_document",
-                output_dimensionality=768
-            )
-            return response['embedding']
+            # self.ef returns a list of embeddings
+            response = self.ef([text])
+            vector = response[0]
+            if hasattr(vector, "tolist"):
+                return vector.tolist()
+            return [float(x) for x in vector]
         except Exception as e:
-            raise RuntimeError(f"Failed to generate embedding for text: {str(e)}")
+            raise RuntimeError(f"Failed to generate local embedding: {str(e)}")
 
     def embed_chunks(self, chunks: List[str], batch_size: int = 20) -> List[List[float]]:
         """
-        Generates embeddings for a list of string chunks.
-        Performs batching to prevent API size limit errors and stay resilient.
-        Returns a list of float lists, each containing 768 elements.
+        Generates 384-dimensional embeddings for a list of string chunks.
+        Performs batching for efficiency.
         """
         if not chunks:
             return []
 
         embeddings = []
-        # Batch requests to be resilient to large payloads or API restrictions
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
             try:
-                response = genai.embed_content(
-                    model=self.model_name,
-                    content=batch,
-                    task_type="retrieval_document",
-                    output_dimensionality=768
-                )
-                # response['embedding'] will be a list of lists of floats
-                embeddings.extend(response['embedding'])
+                response = self.ef(batch)
+                for vector in response:
+                    if hasattr(vector, "tolist"):
+                        embeddings.append(vector.tolist())
+                    else:
+                        embeddings.append([float(x) for x in vector])
             except Exception as e:
-                raise RuntimeError(f"Failed to generate embeddings for chunk batch {i//batch_size + 1}: {str(e)}")
+                raise RuntimeError(f"Failed to generate local embeddings for chunk batch {i//batch_size + 1}: {str(e)}")
 
         return embeddings
 

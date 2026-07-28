@@ -67,7 +67,10 @@ def cleanup_test_files_and_db():
                 os.remove(path)
             except Exception:
                 pass
+    cleanup_db()
 
+
+def cleanup_db():
     # DB cleanup
     db = SessionLocal()
     try:
@@ -95,8 +98,9 @@ def cleanup_test_files_and_db():
 
 
 def setup_test_db_and_auth() -> tuple[str, int, int]:
-    cleanup_test_files_and_db()
-    create_test_pdfs()
+    cleanup_db()
+    if not os.path.exists(SAMPLE_PDF_PATH) or not os.path.exists(SAMPLE_SCANNED_PDF_PATH):
+        create_test_pdfs()
     
     db = SessionLocal()
     try:

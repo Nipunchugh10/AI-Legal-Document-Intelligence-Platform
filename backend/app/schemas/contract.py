@@ -68,3 +68,21 @@ class ClauseAgentResponse(BaseModel):
     clauses: dict[str, ClauseItem] = Field(..., description="Map of clause_type to its details")
 
 
+class RiskItem(BaseModel):
+    """A single identified risk flag."""
+
+    risk_type: str = Field(..., description="Type of the risk (e.g., UNLIMITED_LIABILITY, ONE_SIDED_TERMINATION, etc.)")
+    severity: str = Field(..., description="Risk severity: HIGH, MEDIUM, or LOW")
+    clause_text: str = Field(..., description="The contract clause text associated with the risk")
+    explanation: str = Field(..., description="Explanation of why this is a risk")
+    suggestion: str = Field(..., description="Actionable suggestion for negotiation")
+
+
+class RiskAgentResponse(BaseModel):
+    """Returned when a contract is analyzed by the Risk Assessment Agent (Agent 3)."""
+
+    contract_id: int
+    risks: list[RiskItem] = Field(..., description="List of identified risk items")
+
+
+

@@ -27,6 +27,7 @@ from app.schemas.contract import (
     ChunkingResponse,
     ParsingAgentResponse,
     ClauseAgentResponse,
+    RiskAgentResponse,
 )
 
 router = APIRouter()
@@ -475,6 +476,7 @@ async def delete_contract(
 )
 async def run_parsing_agent(
     contract_id: int,
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -493,6 +495,24 @@ async def run_parsing_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contract not found or not owned by user.",
+        )
+
+    # 1.5. Check cache (database) to save API calls
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent")
+        .first()
+    )
+    if analysis_record and not force:
+        res = analysis_record.result_json
+        return ParsingAgentResponse(
+            contract_id=contract_id,
+            document_type=res.get("document_type", "Legal Document"),
+            party_a=res.get("party_a", "Not mentioned"),
+            party_b=res.get("party_b", "Not mentioned"),
+            effective_date=res.get("effective_date", "Not mentioned"),
+            jurisdiction=res.get("jurisdiction", "Not mentioned"),
+            summary=res.get("summary", ""),
         )
 
     # 2. Get existing raw text or extract from file
@@ -605,6 +625,7 @@ async def run_parsing_agent(
 )
 async def run_clause_agent(
     contract_id: int,
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -623,6 +644,18 @@ async def run_clause_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contract not found or not owned by user.",
+        )
+
+    # 1.5. Check cache (database) to save API calls
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses")
+        .first()
+    )
+    if analysis_record and not force:
+        return ClauseAgentResponse(
+            contract_id=contract_id,
+            clauses=analysis_record.result_json,
         )
 
     # 2. Get existing raw text or extract from file
@@ -699,6 +732,143 @@ async def run_clause_agent(
     return ClauseAgentResponse(
         contract_id=contract_id,
         clauses=clauses,
+    )
+
+
+# ── POST /contracts/{contract_id}/analyze/risks ─────────────────────────────
+
+@router.post(
+    "/{contract_id}/analyze/risks",
+    response_model=RiskAgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Run Risk Assessment Agent (Agent 3)",
+    description=(
+        "Identifies and assesses risky clauses using LangGraph Risk Assessment Agent 3 (Gemini LLM) "
+        "and previously extracted clauses."
+    ),
+)
+async def run_risk_agent(
+    contract_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.analysis import Analysis
+    from app.services.pdf_extractor import extract_pdf_text
+    from app.agents.risk_agent import build_risk_graph
+    from app.agents.base import ContractAnalysisState
+
+    # 1. Fetch contract & check ownership
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 1.5. Check cache (database) to save API calls
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "risks")
+        .first()
+    )
+    if analysis_record and not force:
+        return RiskAgentResponse(
+            contract_id=contract_id,
+            risks=analysis_record.result_json.get("risks", []),
+        )
+
+    # 2. Get existing raw text or extract from file
+    raw_text_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
+        .first()
+    )
+
+    if raw_text_record and raw_text_record.result_json and "text" in raw_text_record.result_json:
+        raw_text = raw_text_record.result_json["text"]
+    else:
+        if not contract.upload_path or not Path(contract.upload_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contract file not found on disk to extract text.",
+            )
+        extraction_res = extract_pdf_text(contract.upload_path)
+        raw_text = extraction_res["text"]
+        new_analysis = Analysis(
+            contract_id=contract_id,
+            analysis_type="raw_text",
+            result_json=extraction_res,
+        )
+        db.add(new_analysis)
+        db.commit()
+
+    # 3. Get existing clauses from database
+    clauses_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses")
+        .first()
+    )
+    
+    clauses = {}
+    if clauses_record and clauses_record.result_json:
+        clauses = clauses_record.result_json
+
+    # 4. Prepare initial state & execute LangGraph risk graph
+    initial_state: ContractAnalysisState = {
+        "contract_id": contract_id,
+        "raw_text": raw_text,
+        "chunks": [],
+        "document_type": None,
+        "metadata": {},
+        "clauses": clauses,
+        "risks": [],
+        "compliance_issues": [],
+        "summary": "",
+        "messages": [],
+        "error": None,
+    }
+
+    risk_graph = build_risk_graph()
+    final_state = risk_graph.invoke(initial_state)
+
+    if final_state.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Risk agent failed: {final_state['error']}",
+        )
+
+    risks = final_state.get("risks", [])
+
+    # 5. Save analysis to database
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "risks")
+        .first()
+    )
+
+    if analysis_record:
+        analysis_record.result_json = {"risks": risks}
+    else:
+        analysis_record = Analysis(
+            contract_id=contract_id,
+            analysis_type="risks",
+            result_json={"risks": risks},
+        )
+        db.add(analysis_record)
+
+    # Update contract status to analyzed if it was parsed/ingested
+    if contract.status in ["pending", "ingested", "parsed"]:
+        contract.status = "analyzed"
+    db.commit()
+
+    return RiskAgentResponse(
+        contract_id=contract_id,
+        risks=risks,
     )
 
 

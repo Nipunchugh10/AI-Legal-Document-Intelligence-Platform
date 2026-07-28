@@ -14,9 +14,14 @@ class VectorStoreService:
         self.client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
         
         # Get or create the core collection for storing contract text chunks
-        # Default distance metric for ChromaDB is cosine distance (L2 is also supported, but cosine is preferred for texts)
         self.collection = self.client.get_or_create_collection(
             name="contract_chunks",
+            metadata={"hnsw:space": "cosine"}
+        )
+
+        # Get or create the collection for storing legal knowledge chunks (Day 24)
+        self.knowledge_collection = self.client.get_or_create_collection(
+            name="legal_knowledge",
             metadata={"hnsw:space": "cosine"}
         )
 
@@ -92,6 +97,86 @@ class VectorStoreService:
                     "chunk_index": metadatas[idx].get("chunk_index"),
                     "contract_id": metadatas[idx].get("contract_id"),
                     # Cosine similarity = 1 - cosine distance
+                    "similarity": 1.0 - distances[idx]
+                })
+
+        return formatted_results
+
+    def add_knowledge_chunks(
+        self,
+        document_name: str,
+        category: str,
+        chunks: List[str],
+        embeddings: List[List[float]],
+    ) -> None:
+        """
+        Store a batch of legal knowledge chunks and their pre-computed embeddings in ChromaDB.
+        Adds metadata fields to allow filtering by category and document_name.
+        """
+        if not chunks or not embeddings:
+            return
+        
+        if len(chunks) != len(embeddings):
+            raise ValueError("The number of chunks must match the number of embeddings.")
+
+        ids = [f"knowledge_{document_name}_chunk_{idx}" for idx in range(len(chunks))]
+        metadatas = [{"document_name": document_name, "category": category, "chunk_index": idx} for idx in range(len(chunks))]
+
+        self.knowledge_collection.add(
+            ids=ids,
+            embeddings=embeddings,
+            documents=chunks,
+            metadatas=metadatas
+        )
+
+    def delete_knowledge_by_document(self, document_name: str) -> None:
+        """Delete all chunks and embeddings associated with a specific knowledge document."""
+        self.knowledge_collection.delete(where={"document_name": document_name})
+
+    def delete_all_knowledge(self) -> None:
+        """Delete all records in the legal_knowledge collection."""
+        self.client.delete_collection(name="legal_knowledge")
+        self.knowledge_collection = self.client.get_or_create_collection(
+            name="legal_knowledge",
+            metadata={"hnsw:space": "cosine"}
+        )
+
+    def query_knowledge(
+        self,
+        query_text: str,
+        category: Optional[str] = None,
+        n_results: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform a similarity search across the legal knowledge collection.
+        Optionally filters results by category.
+        """
+        query_embedding = self.embedder.embed_text(query_text)
+
+        where_filter = {}
+        if category:
+            where_filter = {"category": category}
+
+        results = self.knowledge_collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results,
+            where=where_filter if where_filter else None
+        )
+
+        formatted_results = []
+        if results and "documents" in results and results["documents"]:
+            documents = results["documents"][0]
+            ids = results["ids"][0]
+            metadatas = results["metadatas"][0]
+            distances = results["distances"][0] if "distances" in results else [0.0] * len(documents)
+
+            for idx in range(len(documents)):
+                formatted_results.append({
+                    "id": ids[idx],
+                    "text": documents[idx],
+                    "chunk_index": metadatas[idx].get("chunk_index"),
+                    "category": metadatas[idx].get("category"),
+                    "document_name": metadatas[idx].get("document_name"),
                     "similarity": 1.0 - distances[idx]
                 })
 

@@ -41,21 +41,21 @@ def cleanup_test_environment():
             print(f"\n[!] Note: Could not completely remove test directory {TEST_CHROMA_DIR} due to file locks: {e}")
 
 def test_embedder_service():
-    """Verify that EmbedderService returns 768-dimension vectors using Google GenAI API."""
+    """Verify that EmbedderService returns 384-dimension vectors using local ONNX model."""
     embedder = get_embedder_service()
     
     # 1. Single text embedding
     vector = embedder.embed_text("Hello legal AI platform")
     assert isinstance(vector, list)
-    assert len(vector) == 768
+    assert len(vector) == 384
     assert all(isinstance(val, float) for val in vector)
 
     # 2. Batch chunk embedding
     vectors = embedder.embed_chunks(["Chunk number one", "Chunk number two"])
     assert isinstance(vectors, list)
     assert len(vectors) == 2
-    assert len(vectors[0]) == 768
-    assert len(vectors[1]) == 768
+    assert len(vectors[0]) == 384
+    assert len(vectors[1]) == 384
 
 def test_vector_store_operations():
     """Verify storing, querying, and deleting chunks from ChromaDB."""
