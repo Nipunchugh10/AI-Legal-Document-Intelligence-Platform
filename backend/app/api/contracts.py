@@ -28,6 +28,7 @@ from app.schemas.contract import (
     ParsingAgentResponse,
     ClauseAgentResponse,
     RiskAgentResponse,
+    ComplianceAgentResponse,
 )
 
 router = APIRouter()
@@ -870,6 +871,154 @@ async def run_risk_agent(
         contract_id=contract_id,
         risks=risks,
     )
+
+
+# ── POST /contracts/{contract_id}/analyze/compliance ─────────────────────────
+
+@router.post(
+    "/{contract_id}/analyze/compliance",
+    response_model=ComplianceAgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Run Compliance Agent (Agent 4)",
+    description=(
+        "Checks contract clauses and raw text against legal standards and compliance benchmarks "
+        "using LangGraph Compliance Agent 4 (Gemini LLM) and legal_knowledge vector store chunks."
+    ),
+)
+async def run_compliance_agent(
+    contract_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.analysis import Analysis
+    from app.services.pdf_extractor import extract_pdf_text
+    from app.agents.compliance_agent import build_compliance_graph
+    from app.agents.base import ContractAnalysisState
+
+    # 1. Fetch contract & check ownership
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    # 1.5. Check cache (database) to save API calls
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "compliance")
+        .first()
+    )
+    if analysis_record and not force:
+        return ComplianceAgentResponse(
+            contract_id=contract_id,
+            compliance_issues=analysis_record.result_json.get("compliance_issues", []),
+        )
+
+    # 2. Get existing raw text or extract from file
+    raw_text_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
+        .first()
+    )
+
+    if raw_text_record and raw_text_record.result_json and "text" in raw_text_record.result_json:
+        raw_text = raw_text_record.result_json["text"]
+    else:
+        if not contract.upload_path or not Path(contract.upload_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contract file not found on disk to extract text.",
+            )
+        extraction_res = extract_pdf_text(contract.upload_path)
+        raw_text = extraction_res["text"]
+        new_analysis = Analysis(
+            contract_id=contract_id,
+            analysis_type="raw_text",
+            result_json=extraction_res,
+        )
+        db.add(new_analysis)
+        db.commit()
+
+    # 3. Get existing clauses from database
+    clauses_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses")
+        .first()
+    )
+    
+    clauses = {}
+    if clauses_record and clauses_record.result_json:
+        clauses = clauses_record.result_json
+
+    # 3.5. Get document type from parsing_agent record if available
+    parsing_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent")
+        .first()
+    )
+    doc_type = None
+    if parsing_record and parsing_record.result_json:
+        doc_type = parsing_record.result_json.get("document_type")
+
+    # 4. Prepare initial state & execute LangGraph compliance graph
+    initial_state: ContractAnalysisState = {
+        "contract_id": contract_id,
+        "raw_text": raw_text,
+        "chunks": [],
+        "document_type": doc_type,
+        "metadata": {},
+        "clauses": clauses,
+        "risks": [],
+        "compliance_issues": [],
+        "summary": "",
+        "messages": [],
+        "error": None,
+    }
+
+    compliance_graph = build_compliance_graph()
+    final_state = compliance_graph.invoke(initial_state)
+
+    if final_state.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Compliance agent failed: {final_state['error']}",
+        )
+
+    compliance_issues = final_state.get("compliance_issues", [])
+
+    # 5. Save analysis to database
+    analysis_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "compliance")
+        .first()
+    )
+
+    if analysis_record:
+        analysis_record.result_json = {"compliance_issues": compliance_issues}
+    else:
+        analysis_record = Analysis(
+            contract_id=contract_id,
+            analysis_type="compliance",
+            result_json={"compliance_issues": compliance_issues},
+        )
+        db.add(analysis_record)
+
+    # Update contract status to analyzed if it was parsed/ingested
+    if contract.status in ["pending", "ingested", "parsed"]:
+        contract.status = "analyzed"
+    db.commit()
+
+    return ComplianceAgentResponse(
+        contract_id=contract_id,
+        compliance_issues=compliance_issues,
+    )
+
 
 
 

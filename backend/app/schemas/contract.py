@@ -7,6 +7,7 @@ Day 5 — File Upload System
 """
 
 from datetime import datetime
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
@@ -76,6 +77,8 @@ class RiskItem(BaseModel):
     clause_text: str = Field(..., description="The contract clause text associated with the risk")
     explanation: str = Field(..., description="Explanation of why this is a risk")
     suggestion: str = Field(..., description="Actionable suggestion for negotiation")
+    suggested_revision: Optional[str] = Field(None, description="Redline revision language to replace or amend the clause")
+    negotiation_tip: Optional[str] = Field(None, description="Tactical advice for negotiating this clause")
 
 
 class RiskAgentResponse(BaseModel):
@@ -84,5 +87,57 @@ class RiskAgentResponse(BaseModel):
     contract_id: int
     risks: list[RiskItem] = Field(..., description="List of identified risk items")
 
+
+class ComplianceIssueItem(BaseModel):
+    """A single identified compliance issue."""
+
+    issue_type: str = Field(..., description="Type of compliance issue: MISSING_REQUIRED_CLAUSE, POTENTIALLY_ILLEGAL_TERM, DPDP_COMPLIANCE_ISSUE")
+    clause_type: str = Field(..., description="The type of clause associated with the compliance issue")
+    severity: str = Field(..., description="Severity level: HIGH, MEDIUM, or LOW")
+    explanation: str = Field(..., description="Explanation of the compliance issue")
+    recommendation: str = Field(..., description="Actionable recommendation to achieve compliance")
+
+
+class ComplianceAgentResponse(BaseModel):
+    """Returned when a contract is analyzed by the Compliance Agent (Agent 4)."""
+
+    contract_id: int
+    compliance_issues: list[ComplianceIssueItem] = Field(..., description="List of identified compliance issues")
+
+
+class QASourceItem(BaseModel):
+    """A source snippet chunk cited by the QA agent."""
+
+    chunk_index: int = Field(..., description="The index of the contract chunk used as a source")
+    text: str = Field(..., description="The content of the contract snippet")
+    similarity: float = Field(..., description="The semantic similarity score of the chunk to the question")
+
+
+class QARequest(BaseModel):
+    """Payload for asking a question about a contract."""
+
+    question: str = Field(..., description="The natural language question about the contract")
+
+
+class QAResponse(BaseModel):
+    """Returned when a contract question is answered."""
+
+    contract_id: int = Field(..., description="Database ID of the contract")
+    question: str = Field(..., description="The question that was asked")
+    answer: str = Field(..., description="The generated answer, grounded in the contract")
+    sources: list[QASourceItem] = Field(..., description="The list of cited sources from the contract")
+
+
+class AnalysisWorkflowResponse(BaseModel):
+    """Returned when the full contract analysis workflow runs successfully."""
+
+    contract_id: int = Field(..., description="Database ID of the analyzed contract")
+    status: str = Field(..., description="The status of the analysis workflow")
+    document_type: str = Field(..., description="The classified document type")
+    metadata: dict[str, Any] = Field(..., description="The parsed document metadata (parties, date, jurisdiction)")
+    clauses: dict[str, Any] = Field(..., description="The extracted legal clauses")
+    risks: list[dict[str, Any]] = Field(..., description="The identified risk items")
+    compliance_issues: list[dict[str, Any]] = Field(..., description="The identified compliance issues")
+    summary: str = Field(..., description="The generated Markdown executive summary report")
 
 
