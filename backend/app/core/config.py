@@ -8,10 +8,15 @@ from a .env file at the project root.
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from dotenv import load_dotenv
 
 # Compute the absolute path to the project root .env file
 # config.py is at: backend/app/core/config.py → project root is 3 levels up
 _ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+# Load the environment variables into os.environ on startup for LangSmith and other libraries
+if _ENV_FILE.exists():
+    load_dotenv(str(_ENV_FILE))
 
 
 class Settings(BaseSettings):
@@ -37,6 +42,13 @@ class Settings(BaseSettings):
     # --- AI / LLM (Google Gemini) ---
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
+
+    # --- LangSmith Tracing (Day 29) ---
+    LANGCHAIN_TRACING_V2: str = "false"
+    LANGCHAIN_API_KEY: str = ""
+    LANGCHAIN_PROJECT: str = "ai-legal-document-intelligence"
+    LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
+
 
     # --- Google OAuth ---
     GOOGLE_CLIENT_ID: str = ""

@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -49,6 +52,7 @@ async def run_full_analysis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    logger.info("Starting analysis for contract_id=%s", contract_id)
     # 1. Fetch contract & check ownership
     contract = (
         db.query(Contract)

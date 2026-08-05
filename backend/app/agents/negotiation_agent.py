@@ -66,7 +66,7 @@ def negotiation_advisor_node(state: ContractAnalysisState) -> Dict[str, Any]:
     prompt = NEGOTIATION_ADVISOR_PROMPT.format(risks_json=risks_json_str)
 
     try:
-        response_text = get_llm_response(prompt, temperature=0.1)
+        response_text = get_llm_response(prompt, temperature=0.1, contract_id=contract_id)
         
         # Clean response text if model wrapped it in markdown code blocks
         clean_text = response_text.strip()

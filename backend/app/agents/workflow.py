@@ -79,7 +79,7 @@ def generate_summary_node(state: ContractAnalysisState) -> Dict[str, Any]:
     )
 
     try:
-        summary_report = get_llm_response(prompt, temperature=0.2)
+        summary_report = get_llm_response(prompt, temperature=0.2, contract_id=contract_id)
         return {
             "summary": summary_report.strip(),
             "messages": state.get("messages", []) + [{"role": "system", "content": "Executive summary generated successfully."}]

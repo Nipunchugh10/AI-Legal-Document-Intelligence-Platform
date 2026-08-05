@@ -9,9 +9,12 @@ Day 4 — Auth router registered (/auth/register, /auth/login, /auth/me)
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.core.config import get_settings
 from app.api import auth as auth_router
@@ -19,6 +22,8 @@ from app.api import contracts as contracts_router
 from app.api import qa as qa_router
 from app.api import analysis as analysis_router
 
+# Setup logger for main module
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -100,6 +105,35 @@ app.add_middleware(
 
 
 # ------------------------------------------------------------------
+# Global Exception Handler — Day 29
+# ------------------------------------------------------------------
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Catches all unhandled exceptions, logs them with a traceback,
+    and returns a standard internal server error response.
+    Passes standard FastAPI HTTPExceptions and ValidationErrors through.
+    """
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
+    if isinstance(exc, RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.errors()}
+        )
+        
+    logger.error("Unhandled error: %s", str(exc), exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"}
+    )
+
+
+# ------------------------------------------------------------------
 # Routers — Day 4 (more routers added in subsequent days)
 # ------------------------------------------------------------------
 app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
@@ -148,13 +182,12 @@ async def test_llm(prompt: str = "Say 'Hello from Gemini'"):
     if settings.APP_ENV != "development":
         raise HTTPException(status_code=404, detail="Not found")
 
-    from app.services.llm import get_llm_service
+    from app.services.llm_provider import get_llm_response
     try:
-        service = get_llm_service()
-        response = service.generate_text(prompt)
+        response = get_llm_response(prompt, temperature=0.2)
         return {
             "status": "success",
-            "model": service.model_name,
+            "model": settings.GEMINI_MODEL,
             "response": response
         }
     except Exception as e:

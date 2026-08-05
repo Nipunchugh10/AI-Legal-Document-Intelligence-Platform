@@ -17,36 +17,47 @@ def _ensure_configured():
         _configured = True
 
 @retry(
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(min=2, max=15),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=10),
     reraise=True,
     retry=retry_if_exception_type(Exception),
 )
-def get_llm_response(prompt: str, temperature: float = 0.0) -> str:
+def _call_gemini_with_retry(prompt: str, temperature: float = 0.0) -> str:
+    """Helper function to call Gemini with tenacity retries."""
+    _ensure_configured()
+    settings = get_settings()
+    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.types.GenerationConfig(temperature=temperature)
+    )
+    if response and response.text:
+        return response.text.strip()
+    return ""
+
+def get_llm_response(prompt: str, temperature: float = 0.0, contract_id: int | None = None) -> str:
     """
     Calls the primary Google Gemini model with exponential backoff retry logic.
 
     Args:
-        prompt (str): Text prompt to pass to Gemini.
+        prompt (str): Text prompt to pass to the LLM.
         temperature (float): Sampling temperature (0.0 for deterministic legal analysis).
+        contract_id (int | None): Optional contract ID to log and trace.
 
     Returns:
         str: Model response text.
     """
-    _ensure_configured()
-    settings = get_settings()
-    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    provider_name = "Gemini"
+    cid_str = str(contract_id) if contract_id is not None else "None"
+    
+    logger.info("Starting LLM request for contract_id=%s", cid_str)
     
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(temperature=temperature)
-        )
-        if response and response.text:
-            return response.text.strip()
-        return ""
+        response = _call_gemini_with_retry(prompt, temperature)
+        logger.info("LLM call served by provider=%s for contract_id=%s", provider_name, cid_str)
+        return response
     except Exception as e:
-        logger.warning(f"LLM API call failed (retrying via tenacity): {str(e)}")
+        logger.error(f"Primary LLM API call (Gemini) failed: {str(e)}")
         raise e
 
 def get_langchain_llm(temperature: float = 0.0):

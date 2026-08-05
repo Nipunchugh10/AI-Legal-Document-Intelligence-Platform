@@ -25,11 +25,8 @@ class LLMService:
         Returns:
             str: Generated text response from the model.
         """
-        config = genai.types.GenerationConfig(
-            temperature=temperature,
-        )
-        response = self.model.generate_content(prompt, generation_config=config)
-        return response.text
+        from app.services.llm_provider import get_llm_response
+        return get_llm_response(prompt, temperature=temperature)
 
     def analyze_document(self, document_text: str, task_description: str, temperature: float = 0.1) -> str:
         """

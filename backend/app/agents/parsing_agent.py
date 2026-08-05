@@ -80,7 +80,7 @@ def parse_document_node(state: ContractAnalysisState) -> Dict[str, Any]:
     prompt = f"{PARSING_SYSTEM_PROMPT}\n\nLEGAL DOCUMENT TEXT:\n---\n{sample_text}\n---"
 
     try:
-        llm_response = get_llm_response(prompt, temperature=0.0)
+        llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
         
         doc_type = parsed_data.get("document_type", "Legal Contract")

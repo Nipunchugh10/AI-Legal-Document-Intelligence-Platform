@@ -127,7 +127,7 @@ def extract_clauses_node(state: ContractAnalysisState) -> Dict[str, Any]:
     ]
 
     try:
-        llm_response = get_llm_response(prompt, temperature=0.0)
+        llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
         
         extracted_clauses = parsed_data.get("clauses", [])

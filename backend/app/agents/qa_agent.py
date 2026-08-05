@@ -118,7 +118,7 @@ def answer_question_node(state: QAState) -> Dict[str, Any]:
 
     # 3. Call LLM
     try:
-        llm_response = get_llm_response(prompt, temperature=0.0)
+        llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
         
         answer = parsed_data.get("answer", "")

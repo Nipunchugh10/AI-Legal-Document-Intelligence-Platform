@@ -9,7 +9,7 @@ from app.services.vector_store import get_vector_store_service
 
 logger = logging.getLogger(__name__)
 
-async def ingest_contract(contract_id: int, db: Session) -> dict:
+def ingest_contract(contract_id: int, db: Session) -> dict:
     """
     Executes the end-to-end contract ingestion pipeline:
     1. Extracts raw text from the contract PDF.

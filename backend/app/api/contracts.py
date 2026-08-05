@@ -368,9 +368,10 @@ async def ingest_contract_endpoint(
         )
 
     if not background:
-        # Run synchronously
+        # Run in worker threadpool to prevent blocking the main event loop
         try:
-            await ingest_contract(contract_id, db)
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(ingest_contract, contract_id, db)
             db.refresh(contract)
             return contract
         except Exception as e:
@@ -379,7 +380,7 @@ async def ingest_contract_endpoint(
                 detail=f"Ingestion pipeline failed: {str(e)}",
             )
 
-    # Run in background
+    # Run in background worker
     contract.status = "processing"
     db.commit()
 
@@ -387,10 +388,9 @@ async def ingest_contract_endpoint(
         from app.core.database import SessionLocal
         bg_db = SessionLocal()
         try:
-            import asyncio
-            asyncio.run(ingest_contract(contract_id, bg_db))
-        except Exception:
-            pass
+            ingest_contract(contract_id, bg_db)
+        except Exception as exc:
+            logger.error("Background ingestion failed for contract_id=%s: %s", contract_id, exc, exc_info=True)
         finally:
             bg_db.close()
 
