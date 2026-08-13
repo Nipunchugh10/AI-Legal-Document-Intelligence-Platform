@@ -54,11 +54,15 @@ export const Dashboard: React.FC = () => {
     setIsUploading(true);
 
     // Client-side validations
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setUploadError("Only PDF files are allowed.");
+    const allowedExts = [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tiff", ".bmp", ".docx", ".doc", ".txt", ".md", ".rtf"];
+    const fileExt = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    
+    if (!allowedExts.includes(fileExt)) {
+      setUploadError("Unsupported file type. Allowed: PDF, Photo Scans (PNG, JPG, WEBP), Word (.docx), and Text (.txt).");
       setIsUploading(false);
       return;
     }
+
 
     if (file.size > 10 * 1024 * 1024) {
       setUploadError("File size exceeds 10MB limit.");
@@ -230,9 +234,9 @@ export const Dashboard: React.FC = () => {
 
           {/* Upload Sidebar */}
           <div className="glass-panel panel-padded-lg">
-            <h3 className="title-panel-sm">Upload Document</h3>
+            <h3 className="title-panel-sm">Upload Document or Photo</h3>
             <p className="text-muted-desc">
-              Upload your agreement in PDF format. We support file sizes up to 10MB.
+              Upload contracts in PDF, Photo Scans (PNG, JPG, WEBP), Word (.docx), or Text (.txt). Max 10MB.
             </p>
 
             {uploadError && (
@@ -251,7 +255,7 @@ export const Dashboard: React.FC = () => {
               <input
                 type="file"
                 id="contract-file-upload"
-                accept=".pdf"
+                accept=".pdf, .png, .jpg, .jpeg, .webp, .tiff, .bmp, .docx, .doc, .txt, .md, .rtf, image/*"
                 onChange={handleFileUpload}
                 disabled={isUploading}
                 className="d-none"
@@ -260,15 +264,15 @@ export const Dashboard: React.FC = () => {
                 {isUploading ? (
                   <div className="flex-column-center-gap2">
                     <div className="spinner" />
-                    <span className="text-semibold-sm">Uploading file...</span>
+                    <span className="text-semibold-sm">Uploading & Processing...</span>
                   </div>
                 ) : (
                   <>
                     <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="icon-primary-md">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                     </svg>
-                    <span className="text-bold-md">Choose PDF file</span>
-                    <span className="text-dark-xs-mt1">Click to select files</span>
+                    <span className="text-bold-md">Choose Document or Photo Scan</span>
+                    <span className="text-dark-xs-mt1">Supports PDF, JPG, PNG, DOCX, TXT</span>
                   </>
                 )}
               </label>

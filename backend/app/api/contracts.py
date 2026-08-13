@@ -41,23 +41,33 @@ settings = get_settings()
     "/upload",
     response_model=ContractResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload a PDF contract",
+    summary="Upload a legal contract or document (PDF, Photo/Scan, Word, Text)",
     description=(
-        "Uploads a PDF contract (max 10MB). The file is stored locally in the "
-        "configured uploads directory, and metadata is recorded in the database."
+        "Uploads a legal document (max 10MB). Accepts PDFs (digital & scanned photos), "
+        "images (PNG, JPG, JPEG, WEBP, TIFF, BMP), Word (.docx), and text (.txt, .md). "
+        "The file is saved locally and processed through multimodal Gemini Vision OCR if needed."
     ),
 )
 async def upload_contract(
-    file: UploadFile = File(..., description="The contract PDF file to upload"),
+    file: UploadFile = File(..., description="The contract or document file to upload"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1. Validate file extension (only PDF allowed)
-    if not file.filename.lower().endswith(".pdf"):
+    # 1. Validate file extension
+    ALLOWED_EXTENSIONS = {
+        ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tiff", ".bmp",
+        ".docx", ".doc", ".txt", ".md", ".rtf"
+    }
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only PDF files are allowed.",
+            detail=(
+                f"Unsupported file format '{file_ext}'. Allowed formats: "
+                "PDF, Images (PNG, JPG, JPEG, WEBP, TIFF, BMP), Word (.docx), and Text (.txt, .md)."
+            ),
         )
+
 
     # 2. Read content and validate file size (max 10MB)
     content = await file.read()

@@ -39,7 +39,7 @@ chroma_data/
 
 # Session state (private development notes)
 session_state.md
-
+ELITE_LAWYER_ARCHITECTURE.md
 # Plan (private development notes)
 PLAN.md
 Sample_Freelance_Agreement_TEST.pdf
@@ -50,4 +50,3 @@ backend/uploads/*
 test_chroma_data/
 test_ingestion_chroma/
 desktop.ini
-

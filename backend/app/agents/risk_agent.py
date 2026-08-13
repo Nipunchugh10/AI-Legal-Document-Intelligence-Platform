@@ -8,32 +8,28 @@ from app.services.llm_provider import get_llm_response
 
 logger = logging.getLogger(__name__)
 
-RISK_SYSTEM_PROMPT = """You are an expert AI Legal Risk Assessment Agent.
-Your task is to analyze the contract text or extracted clauses and identify key risk factors for the user.
-For each clause/document text provided, evaluate if it poses any of the following risks:
+RISK_SYSTEM_PROMPT = """You are an Elite Senior Attorney & Legal Risk Analysis Agent.
+Your task is to analyze contract text using the IRAC (Issue, Rule, Application, Conclusion) legal reasoning framework and classify findings into a 3-Tier Traffic Light Flagging System:
 
-1. "UNLIMITED_LIABILITY": Check if there is no cap on damages, if liability is unlimited or uncapped, or if the cap is unreasonably high.
-2. "ONE_SIDED_TERMINATION": Check if only one party has the right to terminate for convenience, or if notice periods or termination penalties are highly one-sided.
-3. "AUTOMATIC_RENEWAL": Check if the contract auto-renews without reasonable prior notice (e.g., auto-renews unless a notice is given, with a short window).
-4. "BROAD_IP_ASSIGNMENT": Check if intellectual property assignment is overly broad (e.g., transferring ownership of all ideas, tools, or pre-existing code, even those unrelated to the project).
-5. "UNILATERAL_MODIFICATION": Check if one party has the right to modify the agreement's terms, fees, or specifications unilaterally without mutual written agreement.
-6. "EXCESSIVE_PENALTIES": Check if there are disproportionate late fees (e.g., extremely high interest rates like >2% per month), penalty charges, or severe default clauses.
-7. "BROAD_CONFIDENTIALITY": Check if confidential information is defined too broadly (e.g., covering information publicly available, or lacking standard exclusions).
+1. "RED_FLAG" (Critical / Fatal Exposure — DO NOT SIGN WITHOUT NEGOTIATING):
+   - Uncapped liabilities, broad indemnity carve-outs, illegal post-employment non-compete covenants (e.g. void under Section 27 Contract Act), one-sided termination forfeiture, automatic pre-existing IP surrenders, unilateral agreement modification, cross-default accelerations, defective title exposure.
 
-For each risk identified, return a structured risk item containing:
-- "risk_type": The exact risk category identifier (must be exactly one of the seven listed above: "UNLIMITED_LIABILITY", "ONE_SIDED_TERMINATION", "AUTOMATIC_RENEWAL", "BROAD_IP_ASSIGNMENT", "UNILATERAL_MODIFICATION", "EXCESSIVE_PENALTIES", "BROAD_CONFIDENTIALITY").
-- "severity": The severity level ("HIGH", "MEDIUM", or "LOW").
-- "clause_text": The relevant text snippet from the contract where the risk is located.
-- "explanation": A clear, plain-English explanation of why this poses a risk to the user.
-- "suggestion": A concrete, actionable negotiation or mitigation recommendation.
+2. "YELLOW_FLAG" (Small Concerns — VERIFY WITH LAWYER BEFORE SIGNING):
+   - Mild ambiguities, missing notice period details, unindexed rent escalations, vague force majeure or pandemic clauses, seat vs venue arbitration ambiguities, long notice periods (>90 days), subjective performance KPIs.
+
+3. "GREEN_FLAG" (Protective & Standard Market Terms — NO ISSUE / FAVORABLE):
+   - Capped liability (e.g., 1x contract value), mutual indemnities, standard 4-tier confidentiality exclusions, clear 30-day exit notices, statutory compliance guarantees, balanced IP carve-outs.
+
+For each item evaluated, return a structured object with:
+- "flag_category": Exactly one of "RED_FLAG", "YELLOW_FLAG", or "GREEN_FLAG".
+- "risk_type": Category identifier (e.g., "UNLIMITED_LIABILITY", "ONE_SIDED_TERMINATION", "AUTOMATIC_RENEWAL", "BROAD_IP_ASSIGNMENT", "UNILATERAL_MODIFICATION", "EXCESSIVE_PENALTIES", "BROAD_CONFIDENTIALITY", "STATUTORY_NON_COMPLIANCE", "PROTECTIVE_STANDARD").
+- "severity": "HIGH" for RED_FLAG, "MEDIUM" for YELLOW_FLAG, "LOW" for GREEN_FLAG.
+- "clause_text": Exact quote or relevant text snippet from the document.
+- "explanation": Plain-English breakdown explaining why this is a Red Flag, Yellow Concern, or Green Protection.
+- "suggestion": Exact action or redline counter-draft recommendation for negotiating with opposing counsel or confirming with a lawyer.
 
 Return ONLY a valid, clean JSON object with a single key "risks" containing a list of risk items.
 Do NOT include markdown formatting, backticks (like ```json), or text before/after the JSON.
-
-If no risks are identified, return:
-{
-  "risks": []
-}
 """
 
 def _clean_and_parse_json(text: str) -> Dict[str, Any]:
@@ -47,7 +43,6 @@ def _clean_and_parse_json(text: str) -> Dict[str, Any]:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        # Fallback: search for JSON object with regex
         match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         if match:
             try:
@@ -69,7 +64,6 @@ def extract_risks_node(state: ContractAnalysisState) -> Dict[str, Any]:
     clauses = state.get("clauses", {})
     raw_text = state.get("raw_text", "")
 
-    # 1. Format context for the LLM
     clauses_input = []
     if clauses:
         for clause_type, details in clauses.items():
@@ -95,7 +89,6 @@ def extract_risks_node(state: ContractAnalysisState) -> Dict[str, Any]:
             "error": "No contract content available for risk assessment."
         }
 
-    # 2. Call Gemini LLM
     prompt = f"{RISK_SYSTEM_PROMPT}\n\n{context_header}\n---\n{context}\n---"
 
     try:
@@ -103,14 +96,24 @@ def extract_risks_node(state: ContractAnalysisState) -> Dict[str, Any]:
         parsed_data = _clean_and_parse_json(llm_response)
         risks_list = parsed_data.get("risks", [])
 
-        # Validate that each risk item has all the expected fields
         validated_risks = []
         for risk in risks_list:
+            flag_cat = risk.get("flag_category")
+            severity = risk.get("severity", "MEDIUM")
+            if not flag_cat:
+                if severity == "HIGH":
+                    flag_cat = "RED_FLAG"
+                elif severity == "LOW":
+                    flag_cat = "GREEN_FLAG"
+                else:
+                    flag_cat = "YELLOW_FLAG"
+
             validated_risks.append({
+                "flag_category": flag_cat,
                 "risk_type": risk.get("risk_type", "UNKNOWN"),
-                "severity": risk.get("severity", "MEDIUM"),
+                "severity": severity,
                 "clause_text": risk.get("clause_text", "Not mentioned"),
-                "explanation": risk.get("explanation", "Potential risk detected."),
+                "explanation": risk.get("explanation", "Potential finding detected."),
                 "suggestion": risk.get("suggestion", "Review this clause carefully with a legal representative.")
             })
 

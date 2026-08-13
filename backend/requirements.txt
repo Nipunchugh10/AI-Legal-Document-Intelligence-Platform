@@ -32,9 +32,12 @@ google-generativeai>=0.8.0
 # --- Google OAuth Verification ---
 google-auth==2.35.0
 
-# --- PDF Processing (Day 16) ---
+# --- Document & Image Processing (PDF, Scans, Photos, Word) ---
 pymupdf==1.24.10
 pdfplumber==0.11.4
+Pillow>=10.0.0
+python-docx>=1.1.0
+
 
 # --- Text Chunking (Day 17) ---
 langchain-text-splitters>=0.2.0

@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session
 from app.models.contract import Contract
 from app.models.analysis import Analysis
-from app.services.pdf_extractor import extract_pdf_text
+from app.services.pdf_extractor import extract_document_text
 from app.services.chunker import chunk_text
 from app.services.embedder import get_embedder_service
 from app.services.vector_store import get_vector_store_service
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def ingest_contract(contract_id: int, db: Session) -> dict:
     """
     Executes the end-to-end contract ingestion pipeline:
-    1. Extracts raw text from the contract PDF.
+    1. Extracts raw text from the contract document (PDF, Photo/Image, DOCX, TXT).
     2. Cleans and chunks the text into token-sized segments.
     3. Generates 768-dimensional embeddings for the chunks using Google GenAI.
     4. Persists the chunks and embeddings into the local ChromaDB vector database.
@@ -25,7 +25,7 @@ def ingest_contract(contract_id: int, db: Session) -> dict:
         logger.error(f"Ingestion failed: Contract {contract_id} not found.")
         raise ValueError(f"Contract {contract_id} not found.")
 
-    logger.info(f"[*] Starting ingestion pipeline for contract {contract_id} ({contract.filename})")
+    logger.info(f"Starting ingestion pipeline for contract {contract_id} ({contract.filename})")
     
     # Update status to 'processing' to prevent concurrent ingestion runs
     contract.status = "processing"
@@ -33,11 +33,11 @@ def ingest_contract(contract_id: int, db: Session) -> dict:
 
     try:
         # --- Step 1: Text Extraction ---
-        logger.info(f"[*] Ingestion step 1/4: Extracting text from {contract.upload_path}")
-        extracted = extract_pdf_text(contract.upload_path)
+        logger.info(f"Ingestion step 1/4: Extracting text from {contract.upload_path}")
+        extracted = extract_document_text(contract.upload_path)
         raw_text = extracted.get("text", "")
         if not raw_text:
-            raise ValueError("No text could be extracted from the PDF contract.")
+            raise ValueError("No text could be extracted from the document.")
 
         # Save raw text analysis record
         raw_analysis = db.query(Analysis).filter(
@@ -64,7 +64,7 @@ def ingest_contract(contract_id: int, db: Session) -> dict:
         db.commit()
 
         # --- Step 2: Text Chunking & Preprocessing ---
-        logger.info("[*] Ingestion step 2/4: Chunking and preprocessing text")
+        logger.info("Ingestion step 2/4: Chunking and preprocessing text")
         chunks = chunk_text(raw_text, chunk_size=1000, chunk_overlap=200)
         if not chunks:
             raise ValueError("Chunking resulted in 0 text chunks.")
@@ -94,12 +94,12 @@ def ingest_contract(contract_id: int, db: Session) -> dict:
         db.commit()
 
         # --- Step 3: Embedding Generation ---
-        logger.info(f"[*] Ingestion step 3/4: Generating embeddings for {len(chunks)} chunks")
+        logger.info(f"Ingestion step 3/4: Generating embeddings for {len(chunks)} chunks")
         embedder = get_embedder_service()
         embeddings = embedder.embed_chunks(chunks)
 
         # --- Step 4: Vector Store Persistence ---
-        logger.info(f"[*] Ingestion step 4/4: Persisting chunks/embeddings to ChromaDB")
+        logger.info("Ingestion step 4/4: Persisting chunks/embeddings to ChromaDB")
         vector_store = get_vector_store_service()
         
         # Clear out any stale embeddings for this contract first (makes pipeline idempotent)
@@ -115,11 +115,11 @@ def ingest_contract(contract_id: int, db: Session) -> dict:
         # --- Pipeline Completion ---
         contract.status = "ingested"
         db.commit()
-        logger.info(f"[+] Ingestion pipeline completed successfully for contract {contract_id}!")
+        logger.info(f"Ingestion pipeline completed successfully for contract {contract_id}!")
         return {"status": "success", "chunk_count": len(chunks)}
 
     except Exception as e:
-        logger.exception(f"[-] Ingestion pipeline failed for contract {contract_id}: {str(e)}")
+        logger.exception(f"Ingestion pipeline failed for contract {contract_id}: {str(e)}")
         contract.status = "failed"
         db.commit()
         raise e
