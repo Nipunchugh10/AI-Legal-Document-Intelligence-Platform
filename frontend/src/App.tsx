@@ -4,37 +4,20 @@ import { Welcome } from "./pages/Welcome";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
+import { UploadPage } from "./pages/UploadPage";
+import { ContractDetailPage } from "./pages/ContractDetailPage";
+import { QAPage } from "./pages/QAPage";
+import { ComparisonPage } from "./pages/ComparisonPage";
 import { Security } from "./pages/Security";
+import { HistoryPage } from "./pages/HistoryPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/useAuthStore";
-import { IdleTimer } from "./components/IdleTimer";
 import "./App.css";
 
-// Route guard to check user login status before showing protected pages
-const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const isLoading = useAuthStore((state) => state.isLoading);
+export const App: React.FC = () => {
   const checkAuth = useAuthStore((state) => state.checkAuth);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  if (isLoading) {
-    return (
-      <div className="page-loader">
-        <div className="spinner" />
-        <p className="loader-text">Verifying session...</p>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-};
-
-const App: React.FC = () => {
-  const checkAuth = useAuthStore((state) => state.checkAuth);
-
-  // Check user session status and restore theme on app load
+  // Initialize theme from localStorage and verify session on application mount
   useEffect(() => {
     checkAuth();
     const savedTheme = localStorage.getItem("theme") || "dark";
@@ -47,36 +30,24 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <IdleTimer />
       <Routes>
-        {/* Welcome / Landing page */}
+        {/* Public Routes */}
         <Route path="/" element={<Welcome />} />
-
-        {/* Public auth routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected workspace dashboard */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Protected security settings */}
-        <Route
-          path="/security"
-          element={
-            <ProtectedRoute>
-              <Security />
-            </ProtectedRoute>
-          }
-        />
+        {/* Protected App Shell Routes (Guarded by ProtectedRoute and wrapped in Layout) */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/contracts/upload" element={<UploadPage />} />
+          <Route path="/contracts/:id" element={<ContractDetailPage />} />
+          <Route path="/contracts/:id/ask" element={<QAPage />} />
+          <Route path="/contracts/compare" element={<ComparisonPage />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/history" element={<HistoryPage />} />
+        </Route>
 
-        {/* Fallback routes */}
+        {/* Fallback Catch-All Route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

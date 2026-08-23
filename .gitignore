@@ -8,6 +8,8 @@ build/
 *.egg
 venv/
 .venv/
+venv_linux/
+backend/venv_linux/
 
 # Environment
 .env
@@ -43,6 +45,7 @@ ELITE_LAWYER_ARCHITECTURE.md
 # Plan (private development notes)
 PLAN.md
 Sample_Freelance_Agreement_TEST.pdf
+*.pdf
 
 # Local Uploads and Temp Databases
 backend/uploads/*

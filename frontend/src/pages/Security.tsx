@@ -239,27 +239,8 @@ export const Security: React.FC = () => {
   };
 
   return (
-    <div className="app-container">
-      {/* Navbar Component */}
-      <header className="navbar">
-        <div
-          onClick={() => navigate(user ? "/dashboard" : "/")}
-          className="navbar-brand"
-          style={{ cursor: "pointer" }}
-        >
-          Legal<span>Intelligence</span>
-        </div>
-        <div className="navbar-actions">
-          <span className="user-email">{user?.email}</span>
-          <button onClick={() => navigate("/dashboard")} className="btn btn-secondary btn-nav-action">
-            Workspace
-          </button>
-        </div>
-      </header>
-
-      {/* Main Security Settings Panel */}
-      <main className="main-content page-container flex-center-pt10">
-        <div className="glass-panel panel-auth-setting">
+    <div className="security-page-content" style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+      <div className="glass-panel panel-auth-setting" style={{ maxWidth: "680px", width: "100%" }}>
 
           <div className="flex-align-center-gap3-mb2">
             <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary">
@@ -446,7 +427,6 @@ export const Security: React.FC = () => {
         </div>
 
         </div>
-      </main>
-    </div>
+      </div>
   );
 };
