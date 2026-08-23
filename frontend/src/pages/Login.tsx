@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import api from "../services/api";
 import { useAuthStore, type User } from "../store/useAuthStore";
 
@@ -17,13 +17,15 @@ interface LoginFormData {
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExpiredAlert, setShowExpiredAlert] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // 2FA login state
   const [requires2fa, setRequires2fa] = useState(false);
@@ -31,9 +33,13 @@ export const Login: React.FC = () => {
   const [maskedMessage, setMaskedMessage] = useState("");
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpirySeconds, setOtpExpirySeconds] = useState(300); // 5 minutes
   const [otpSuccessMsg, setOtpSuccessMsg] = useState<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Where to redirect after login (preserve attempted route)
+  const fromPath = (location.state as any)?.from?.pathname || "/dashboard";
 
   const handleGoogleCredentialResponse = async (response: any) => {
     setErrorMsg(null);
@@ -47,26 +53,21 @@ export const Login: React.FC = () => {
 
       const { access_token, refresh_token } = res.data;
 
-      // Temporary token storage so interceptor can fetch profile
       localStorage.setItem("access_token", access_token);
       localStorage.setItem("refresh_token", refresh_token);
 
-      // Fetch user profile
       const userResponse = await api.get<User>("/auth/me");
       const user = userResponse.data;
 
-      // Save to Zustand store
       login(access_token, refresh_token, user);
-      
-      // Redirect to dashboard
-      navigate("/dashboard");
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       if (err.response && err.response.data && err.response.data.detail) {
         setErrorMsg(err.response.data.detail);
       } else {
-        setErrorMsg("Google Sign-In failed. Please try again.");
+        setErrorMsg("Google Sign-In failed. Please try logging in with your email and password.");
       }
     } finally {
       setIsSubmitting(false);
@@ -105,10 +106,8 @@ export const Login: React.FC = () => {
       }
     };
 
-    // Try initiating immediately
     initGoogle();
 
-    // Poll every 200ms until loaded (max 5 seconds)
     let attempts = 0;
     intervalId = setInterval(() => {
       attempts++;
@@ -126,15 +125,16 @@ export const Login: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>();
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/dashboard");
+      navigate(fromPath, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, fromPath]);
 
   // Check if redirected due to session expiry
   useEffect(() => {
@@ -152,8 +152,23 @@ export const Login: React.FC = () => {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
+  // Handle 5-minute OTP countdown timer
+  useEffect(() => {
+    if (!requires2fa || otpExpirySeconds <= 0) return;
+    const timer = setTimeout(() => {
+      setOtpExpirySeconds((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [requires2fa, otpExpirySeconds]);
 
-
+  // Auto-focus first OTP digit when 2FA modal opens
+  useEffect(() => {
+    if (requires2fa) {
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 100);
+    }
+  }, [requires2fa]);
 
   const onSubmit = async (data: LoginFormData) => {
     setErrorMsg(null);
@@ -161,20 +176,24 @@ export const Login: React.FC = () => {
     setShowExpiredAlert(false);
 
     try {
-      // 1. Authenticate with backend
       const response = await api.post("/auth/login", {
         email: data.email,
         password: data.password,
       });
-      
-      const { access_token, refresh_token, requires_2fa, pending_2fa_token, message } = response.data;
+
+      const { access_token, refresh_token, requires_2fa, pending_2fa_token, message } =
+        response.data;
 
       // If user requires two-factor authentication
       if (requires_2fa) {
         setPendingToken(pending_2fa_token);
-        setMaskedMessage(message || "Enter the verification code sent to your registered email address.");
+        setMaskedMessage(
+          message || "Enter the 6-digit verification code sent to your registered email address."
+        );
         setRequires2fa(true);
         setResendCooldown(30);
+        setOtpExpirySeconds(300);
+        setOtpDigits(["", "", "", "", "", ""]);
         return;
       }
 
@@ -182,22 +201,18 @@ export const Login: React.FC = () => {
       localStorage.setItem("access_token", access_token);
       localStorage.setItem("refresh_token", refresh_token);
 
-      // 2. Fetch user profile
       const userResponse = await api.get<User>("/auth/me");
       const user = userResponse.data;
 
-      // 3. Save to Zustand store
       login(access_token, refresh_token, user);
-      
-      // Redirect to dashboard
-      navigate("/dashboard");
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       if (err.response && err.response.data && err.response.data.detail) {
         setErrorMsg(err.response.data.detail);
       } else {
-        setErrorMsg("Failed to connect to the server. Please try again later.");
+        setErrorMsg("Failed to connect to the server. Please check your network connection.");
       }
     } finally {
       setIsSubmitting(false);
@@ -205,24 +220,33 @@ export const Login: React.FC = () => {
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // numeric only
+    if (!/^\d*$/.test(value)) return;
     const newDigits = [...otpDigits];
-    
-    // If user pasted or typed multiple digits
+
     if (value.length > 1) {
       const digits = value.slice(0, 6 - index).split("");
       for (let i = 0; i < digits.length; i++) {
         newDigits[index + i] = digits[i];
       }
       setOtpDigits(newDigits);
-      
+
       const nextIndex = Math.min(index + digits.length, 5);
       inputRefs.current[nextIndex]?.focus();
+
+      // Auto-submit if all 6 digits are populated
+      if (newDigits.every((d) => d.length === 1)) {
+        handle2faVerify(newDigits.join(""));
+      }
     } else {
       newDigits[index] = value;
       setOtpDigits(newDigits);
       if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
+      }
+
+      // Auto-submit when 6th digit entered
+      if (value && index === 5 && newDigits.every((d) => d.length === 1)) {
+        handle2faVerify(newDigits.join(""));
       }
     }
   };
@@ -248,27 +272,22 @@ export const Login: React.FC = () => {
         pending_2fa_token: pendingToken,
         otp_code: code,
       });
-      
+
       const { access_token, refresh_token } = response.data;
 
-      // Temporary token storage so interceptor can fetch profile
       localStorage.setItem("access_token", access_token);
       localStorage.setItem("refresh_token", refresh_token);
 
-      // Fetch user profile
       const userResponse = await api.get<User>("/auth/me");
       const user = userResponse.data;
 
-      // Save to Zustand store
       login(access_token, refresh_token, user);
-      
-      // Redirect to dashboard
-      navigate("/dashboard");
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
       if (err.response && err.response.data && err.response.data.detail) {
         setErrorMsg(err.response.data.detail);
       } else {
-        setErrorMsg("Verification failed. Please try again.");
+        setErrorMsg("Verification code is invalid or expired. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -284,89 +303,121 @@ export const Login: React.FC = () => {
       await api.post("/auth/2fa/resend-otp", {
         pending_2fa_token: pendingToken,
       });
-      setOtpSuccessMsg("A new verification code has been sent.");
+      setOtpSuccessMsg("A new verification code has been dispatched to your email.");
       setResendCooldown(30);
+      setOtpExpirySeconds(300);
+      setOtpDigits(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
     } catch (err: any) {
       if (err.response && err.response.data && err.response.data.detail) {
         setErrorMsg(err.response.data.detail);
       } else {
-        setErrorMsg("Failed to resend code. Please try again.");
+        setErrorMsg("Failed to resend code. Please wait a moment and try again.");
       }
     }
   };
 
+  const fillDemoCredentials = () => {
+    setValue("email", "lawyer@example.com");
+    setValue("password", "SecurePassword123!");
+    setErrorMsg(null);
+  };
+
   // Render 2FA verification panel
   if (requires2fa) {
+    const mins = Math.floor(otpExpirySeconds / 60);
+    const secs = otpExpirySeconds % 60;
+    const formattedTime = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         <header className="navbar">
-          <div
-            onClick={() => navigate("/")}
-            className="navbar-brand"
-            style={{ cursor: "pointer" }}
-          >
+          <div onClick={() => navigate("/")} className="navbar-brand" style={{ cursor: "pointer" }}>
             Legal<span>Intelligence</span>
           </div>
         </header>
+
         <div className="auth-container" style={{ flex: 1 }}>
           <div className="glass-panel auth-card">
-          <h2 className="auth-title">Enter Verification Code</h2>
-          <p className="auth-subtitle">{maskedMessage}</p>
-
-          {otpSuccessMsg && (
-            <div className="alert alert-success">
-              {otpSuccessMsg}
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "rgba(92, 98, 236, 0.12)",
+                color: "var(--color-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px auto",
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
             </div>
-          )}
 
-          {errorMsg && (
-            <div className="alert alert-danger">
-              {errorMsg}
+            <h2 className="auth-title">Two-Factor Authentication</h2>
+            <p className="auth-subtitle">{maskedMessage}</p>
+
+            {otpSuccessMsg && <div className="alert alert-success">{otpSuccessMsg}</div>}
+            {errorMsg && <div className="alert alert-danger">{errorMsg}</div>}
+
+            <div style={{ textAlign: "center", marginBottom: "12px", fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
+              Code expires in:{" "}
+              <strong style={{ color: otpExpirySeconds < 60 ? "var(--color-danger)" : "var(--color-primary)" }}>
+                {formattedTime}
+              </strong>
             </div>
-          )}
-          <div>
+
             <div className="otp-container">
               {otpDigits.map((digit, idx) => (
                 <input
                   key={idx}
-                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  ref={(el) => {
+                    inputRefs.current[idx] = el;
+                  }}
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={6}
                   value={digit}
                   className="otp-digit-input"
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || otpExpirySeconds <= 0}
                   title={`Verification digit ${idx + 1}`}
-                  placeholder="-"
+                  placeholder="•"
                 />
               ))}
             </div>
 
             <button
               onClick={() => handle2faVerify()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || otpExpirySeconds <= 0}
               className="btn btn-primary w-full mt-3"
             >
-              {isSubmitting ? (
-                <div className="spinner spinner-sm" />
-              ) : (
-                "Verify & Log In"
-              )}
+              {isSubmitting ? <div className="spinner spinner-sm" /> : "Verify & Sign In"}
             </button>
 
             <div className="auth-footer mt-6">
               Didn't receive the code?{" "}
               {resendCooldown > 0 ? (
-                <span className="text-dark">
-                  Resend code in {resendCooldown}s
-                </span>
+                <span className="text-dark">Resend in {resendCooldown}s</span>
               ) : (
-                <button
-                  onClick={handleResendOtp}
-                  className="btn-inline-primary"
-                >
-                  Resend code
+                <button onClick={handleResendOtp} className="btn-inline-primary">
+                  Resend Code
                 </button>
               )}
             </div>
@@ -382,13 +433,12 @@ export const Login: React.FC = () => {
                 }}
                 className="btn-inline-muted"
               >
-                Back to Login
+                ← Back to Login
               </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
     );
   }
 
@@ -396,99 +446,147 @@ export const Login: React.FC = () => {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header className="navbar">
-        <div
-          onClick={() => navigate("/")}
-          className="navbar-brand"
-          style={{ cursor: "pointer" }}
-        >
+        <div onClick={() => navigate("/")} className="navbar-brand" style={{ cursor: "pointer" }}>
           Legal<span>Intelligence</span>
         </div>
       </header>
+
       <div className="auth-container" style={{ flex: 1 }}>
         <div className="glass-panel auth-card">
-        <h2 className="auth-title">Welcome Back</h2>
-        <p className="auth-subtitle">Log in to review and analyze your contracts</p>
+          <h2 className="auth-title">Welcome Back</h2>
+          <p className="auth-subtitle">Log in to review, analyze, and negotiate your contracts</p>
 
-        {showExpiredAlert && (
-          <div className="alert alert-warning">
-            Your session has expired. Please log in again.
+          {showExpiredAlert && (
+            <div className="alert alert-warning">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>Your session expired due to inactivity. Please sign in again.</span>
+            </div>
+          )}
+
+          {errorMsg && <div className="alert alert-danger">{errorMsg}</div>}
+
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="name@company.com"
+                className={`form-control ${errors.email ? "is-invalid" : ""}`}
+                {...register("email", {
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Please enter a valid email address",
+                  },
+                })}
+              />
+              {errors.email && <span className="error-msg-text">{errors.email.message}</span>}
+            </div>
+
+            <div className="form-group">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label className="form-label" htmlFor="password">
+                  Password
+                </label>
+              </div>
+              <div className="input-password-wrapper">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className={`form-control ${errors.password ? "is-invalid" : ""}`}
+                  {...register("password", {
+                    required: "Password is required",
+                  })}
+                />
+                <button
+                  type="button"
+                  className="btn-password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                      <line x1="2" y1="2" x2="22" y2="22" />
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {errors.password && <span className="error-msg-text">{errors.password.message}</span>}
+            </div>
+
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary w-full mt-3">
+              {isSubmitting ? <div className="spinner spinner-sm" /> : "Sign In"}
+            </button>
+          </form>
+
+          {/* Quick Demo Credentials Pill */}
+          <div className="auth-demo-pill" onClick={fillDemoCredentials} title="Click to fill test credentials">
+            <span>
+              💡 <strong>Demo Login:</strong> lawyer@example.com
+            </span>
+            <span style={{ color: "var(--color-primary)", fontWeight: "600" }}>Auto-Fill</span>
           </div>
-        )}
 
-        {errorMsg && (
-          <div className="alert alert-danger">
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="name@company.com"
-              className={`form-control ${errors.email ? "is-invalid" : ""}`}
-              {...register("email", {
-                required: "Email is required",
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Invalid email address",
-                },
-              })}
-            />
-            {errors.email && (
-              <span className="error-msg-text">
-                {errors.email.message}
-              </span>
-            )}
+          <div className="auth-divider">
+            <span>or</span>
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              className={`form-control ${errors.password ? "is-invalid" : ""}`}
-              {...register("password", {
-                required: "Password is required",
-              })}
-            />
-            {errors.password && (
-              <span className="error-msg-text">
-                {errors.password.message}
-              </span>
-            )}
+          <div className="google-btn-wrapper">
+            <div id="google-signin-btn"></div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary w-full mt-3"
-          >
-            {isSubmitting ? <div className="spinner spinner-sm" /> : "Log In"}
-          </button>
-        </form>
-
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
-
-        <div className="google-btn-wrapper">
-          <div id="google-signin-btn"></div>
-        </div>
-
-        <div className="auth-footer">
-          Don't have an account?{" "}
-          <Link to="/register">Create one free</Link>
+          <div className="auth-footer">
+            Don't have an account? <Link to="/register">Create one free</Link>
+          </div>
         </div>
       </div>
     </div>
-  </div>
   );
 };
