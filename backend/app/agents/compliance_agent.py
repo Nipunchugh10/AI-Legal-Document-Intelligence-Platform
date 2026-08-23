@@ -143,9 +143,9 @@ def check_compliance_node(state: ContractAnalysisState) -> Dict[str, Any]:
 
     # 4. Format contract clauses context
     clauses_parts = []
-    if clauses:
+    if clauses and isinstance(clauses, dict):
         for c_type, details in clauses.items():
-            if details.get("present"):
+            if isinstance(details, dict) and details.get("present"):
                 clauses_parts.append(
                     f"Clause Type: {c_type}\n"
                     f"Text: {details.get('text')}\n"
@@ -181,18 +181,26 @@ def check_compliance_node(state: ContractAnalysisState) -> Dict[str, Any]:
     try:
         llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
-        issues_list = parsed_data.get("compliance_issues", [])
+        
+        if isinstance(parsed_data, list):
+            issues_list = parsed_data
+        elif isinstance(parsed_data, dict):
+            issues_list = parsed_data.get("compliance_issues", [])
+        else:
+            issues_list = []
 
         # Validate structured fields
         validated_issues = []
-        for issue in issues_list:
-            validated_issues.append({
-                "issue_type": issue.get("issue_type", "UNKNOWN"),
-                "clause_type": issue.get("clause_type", "unknown"),
-                "severity": issue.get("severity", "MEDIUM"),
-                "explanation": issue.get("explanation", "Compliance issue identified."),
-                "recommendation": issue.get("recommendation", "Review and revise the clause to follow best practice standards.")
-            })
+        if isinstance(issues_list, list):
+            for issue in issues_list:
+                if isinstance(issue, dict):
+                    validated_issues.append({
+                        "issue_type": str(issue.get("issue_type", "UNKNOWN")),
+                        "clause_type": str(issue.get("clause_type", "unknown")),
+                        "severity": str(issue.get("severity", "MEDIUM")),
+                        "explanation": str(issue.get("explanation", "Compliance issue identified.")),
+                        "recommendation": str(issue.get("recommendation", "Review and revise the clause to follow best practice standards."))
+                    })
 
         return {
             "compliance_issues": validated_issues,

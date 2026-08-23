@@ -25,7 +25,7 @@ Do NOT include markdown formatting, backticks, or text before/after the JSON.
 """
 
 def _clean_and_parse_json(text: str) -> Dict[str, Any]:
-    """Cleans LLM response text and parses it as a JSON dictionary."""
+    """Cleans LLM response text and safely parses it as a JSON dictionary."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned, flags=re.IGNORECASE)
@@ -33,24 +33,32 @@ def _clean_and_parse_json(text: str) -> Dict[str, Any]:
         cleaned = cleaned.strip()
 
     try:
-        return json.loads(cleaned)
+        data = json.loads(cleaned)
+        if isinstance(data, list):
+            if len(data) > 0 and isinstance(data[0], dict):
+                return data[0]
+            return {}
+        if isinstance(data, dict):
+            return data
+        return {}
     except json.JSONDecodeError:
-        # Fallback: search for JSON object with regex
         match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    return data
             except json.JSONDecodeError:
                 pass
         
         logger.error(f"Failed to parse JSON from LLM response: {text[:200]}")
         return {
-            "document_type": "Unknown Document",
+            "document_type": "Legal Contract",
             "party_a": "Not mentioned",
             "party_b": "Not mentioned",
             "effective_date": "Not mentioned",
             "jurisdiction": "Not mentioned",
-            "summary": "Document parsing completed with raw text analysis.",
+            "summary": "Document parsing completed.",
         }
 
 def parse_document_node(state: ContractAnalysisState) -> Dict[str, Any]:
@@ -63,7 +71,7 @@ def parse_document_node(state: ContractAnalysisState) -> Dict[str, Any]:
     
     if not raw_text:
         return {
-            "document_type": "Unknown Document",
+            "document_type": "Legal Contract",
             "metadata": {
                 "party_a": "Not mentioned",
                 "party_b": "Not mentioned",
@@ -83,6 +91,9 @@ def parse_document_node(state: ContractAnalysisState) -> Dict[str, Any]:
         llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
         
+        if not isinstance(parsed_data, dict):
+            parsed_data = {}
+
         doc_type = parsed_data.get("document_type", "Legal Contract")
         metadata = {
             "party_a": parsed_data.get("party_a", "Not mentioned"),

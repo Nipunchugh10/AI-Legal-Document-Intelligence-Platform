@@ -134,23 +134,39 @@ async def run_full_analysis(
     final_state = workflow.invoke(initial_state)
 
     if final_state.get("error"):
+        raw_err = str(final_state["error"])
+        if "429" in raw_err or "quota" in raw_err.lower() or "ResourceExhausted" in raw_err:
+            clean_err = "Google AI quota limit reached. Please wait a moment and try again."
+        elif "503" in raw_err:
+            clean_err = "AI service temporarily busy. Please retry in a few moments."
+        else:
+            clean_err = f"Analysis failed: {raw_err[:150]}"
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis workflow failed: {final_state['error']}",
+            detail=clean_err,
         )
 
     # 5. Extract findings from final state
     doc_type = final_state.get("document_type", "Legal Document")
     metadata = final_state.get("metadata", {})
-    party_a = metadata.get("party_a", "Not mentioned")
-    party_b = metadata.get("party_b", "Not mentioned")
-    effective_date = metadata.get("effective_date", "Not mentioned")
-    jurisdiction = metadata.get("jurisdiction", "Not mentioned")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    party_a = str(metadata.get("party_a", "Not mentioned"))
+    party_b = str(metadata.get("party_b", "Not mentioned"))
+    effective_date = str(metadata.get("effective_date", "Not mentioned"))
+    jurisdiction = str(metadata.get("jurisdiction", "Not mentioned"))
     
     clauses = final_state.get("clauses", {})
+    if not isinstance(clauses, dict):
+        clauses = {}
     risks = final_state.get("risks", [])
+    if not isinstance(risks, list):
+        risks = []
     compliance = final_state.get("compliance_issues", [])
-    summary = final_state.get("summary", "")
+    if not isinstance(compliance, list):
+        compliance = []
+    summary = str(final_state.get("summary", ""))
 
     # 6. Save each finding back to the PostgreSQL database
     parsing_payload = {
@@ -187,3 +203,96 @@ async def run_full_analysis(
         compliance_issues=compliance,
         summary=summary,
     )
+
+
+@router.get(
+    "/{contract_id}/analysis",
+    response_model=AnalysisWorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get existing analysis results for a contract",
+)
+async def get_contract_analysis(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieves persisted analysis findings from PostgreSQL without triggering LLM calls."""
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contract not found or not owned by user.",
+        )
+
+    parsing_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent").first()
+    clauses_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses").first()
+    risks_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "risks").first()
+    compliance_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "compliance").first()
+    summary_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "summary").first()
+
+    if not (parsing_record or clauses_record or risks_record or summary_record):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No analysis found for this contract. Please run analysis first.",
+        )
+
+    p_res = parsing_record.result_json if parsing_record and isinstance(parsing_record.result_json, dict) else {}
+    c_res = clauses_record.result_json if clauses_record and isinstance(clauses_record.result_json, dict) else {}
+    r_res = risks_record.result_json if risks_record and isinstance(risks_record.result_json, dict) else {}
+    comp_res = compliance_record.result_json if compliance_record and isinstance(compliance_record.result_json, dict) else {}
+    s_res = summary_record.result_json if summary_record and isinstance(summary_record.result_json, dict) else {}
+
+    return AnalysisWorkflowResponse(
+        contract_id=contract_id,
+        status=contract.status,
+        document_type=p_res.get("document_type", "Legal Contract"),
+        metadata={
+            "party_a": p_res.get("party_a", "Not mentioned"),
+            "party_b": p_res.get("party_b", "Not mentioned"),
+            "effective_date": p_res.get("effective_date", "Not mentioned"),
+            "jurisdiction": p_res.get("jurisdiction", "Not mentioned"),
+        },
+        clauses=c_res,
+        risks=r_res.get("risks", []) if isinstance(r_res, dict) else [],
+        compliance_issues=comp_res.get("compliance_issues", []) if isinstance(comp_res, dict) else [],
+        summary=s_res.get("summary", "") if isinstance(s_res, dict) else "",
+    )
+
+
+@router.get(
+    "/{contract_id}/text",
+    status_code=status.HTTP_200_OK,
+    summary="Get raw extracted text of contract",
+)
+async def get_contract_text(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieves the extracted raw text for a contract document."""
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
+        .first()
+    )
+    if not contract:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found.")
+
+    raw_text_record = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
+        .first()
+    )
+    if raw_text_record and raw_text_record.result_json and isinstance(raw_text_record.result_json, dict) and "text" in raw_text_record.result_json:
+        return {"contract_id": contract_id, "text": raw_text_record.result_json["text"]}
+
+    if contract.upload_path and Path(contract.upload_path).exists():
+        from app.services.pdf_extractor import extract_document_text
+        res = extract_document_text(contract.upload_path)
+        return {"contract_id": contract_id, "text": res.get("text", "")}
+
+    return {"contract_id": contract_id, "text": ""}

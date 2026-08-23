@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import api from "../services/api";
+import { queryClient } from "../services/queryClient";
+import { useContractStore } from "./useContractStore";
 
 export interface User {
   id: number;
@@ -26,9 +28,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem("access_token"),
   refreshToken: localStorage.getItem("refresh_token"),
   isAuthenticated: !!localStorage.getItem("access_token"),
-  isLoading: true,
+  isLoading: !!localStorage.getItem("access_token"),
 
   login: (token, refreshToken, user) => {
+    // 1. Clear previous session cache completely to guarantee tenant isolation
+    queryClient.clear();
+    useContractStore.getState().clearStore();
+
+    // 2. Persist new credentials
     localStorage.setItem("access_token", token);
     localStorage.setItem("refresh_token", refreshToken);
     set({ token, refreshToken, user, isAuthenticated: true, isLoading: false });
@@ -43,8 +50,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.error("Failed to revoke session on logout", e);
       }
     }
+
+    // Completely purge all client data and cache
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    queryClient.clear();
+    useContractStore.getState().clearStore();
+
     set({ token: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false });
   },
 
@@ -55,6 +67,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkAuth: async () => {
     const { token } = get();
     if (!token) {
+      queryClient.clear();
+      useContractStore.getState().clearStore();
       set({ isLoading: false, isAuthenticated: false, user: null });
       return null;
     }
@@ -68,6 +82,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      queryClient.clear();
+      useContractStore.getState().clearStore();
       set({ token: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false });
       return null;
     }

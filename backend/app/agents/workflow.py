@@ -38,9 +38,15 @@ def generate_summary_node(state: ContractAnalysisState) -> Dict[str, Any]:
     contract_id = state.get("contract_id", 0)
     doc_type = state.get("document_type", "Legal Contract")
     metadata = state.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
     clauses = state.get("clauses", {})
     risks = state.get("risks", [])
+    if not isinstance(risks, list):
+        risks = []
     compliance = state.get("compliance_issues", [])
+    if not isinstance(compliance, list):
+        compliance = []
 
     # Format the inputs for the LLM prompt
     metadata_str = (
@@ -53,17 +59,19 @@ def generate_summary_node(state: ContractAnalysisState) -> Dict[str, Any]:
     
     risks_list = []
     for r in risks:
-        risk_item_str = f"- [{r.get('severity', 'MEDIUM')}] {r.get('risk_type', 'UNKNOWN')}: {r.get('explanation', '')} (Clause: {r.get('clause_text', '')})"
-        if r.get("suggested_revision"):
-            risk_item_str += f"\n  * **Suggested Revision:** {r.get('suggested_revision')}"
-        if r.get("negotiation_tip"):
-            risk_item_str += f"\n  * **Negotiation Tip:** {r.get('negotiation_tip')}"
-        risks_list.append(risk_item_str)
+        if isinstance(r, dict):
+            risk_item_str = f"- [{r.get('severity', 'MEDIUM')}] {r.get('risk_type', 'UNKNOWN')}: {r.get('explanation', '')} (Clause: {r.get('clause_text', '')})"
+            if r.get("suggested_revision"):
+                risk_item_str += f"\n  * **Suggested Revision:** {r.get('suggested_revision')}"
+            if r.get("negotiation_tip"):
+                risk_item_str += f"\n  * **Negotiation Tip:** {r.get('negotiation_tip')}"
+            risks_list.append(risk_item_str)
     risks_str = "\n".join(risks_list) if risks_list else "No major risks identified."
 
     comp_list = []
     for c in compliance:
-        comp_list.append(f"- [{c.get('severity', 'MEDIUM')}] {c.get('issue_type', 'UNKNOWN')} in {c.get('clause_type', 'unknown')}: {c.get('explanation', '')}")
+        if isinstance(c, dict):
+            comp_list.append(f"- [{c.get('severity', 'MEDIUM')}] {c.get('issue_type', 'UNKNOWN')} in {c.get('clause_type', 'unknown')}: {c.get('explanation', '')}")
     comp_str = "\n".join(comp_list) if comp_list else "No compliance issues identified."
 
     prompt = (

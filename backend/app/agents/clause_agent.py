@@ -130,18 +130,25 @@ def extract_clauses_node(state: ContractAnalysisState) -> Dict[str, Any]:
         llm_response = get_llm_response(prompt, temperature=0.0, contract_id=contract_id)
         parsed_data = _clean_and_parse_json(llm_response)
         
-        extracted_clauses = parsed_data.get("clauses", [])
+        if isinstance(parsed_data, list):
+            extracted_clauses = parsed_data
+        elif isinstance(parsed_data, dict):
+            extracted_clauses = parsed_data.get("clauses", [])
+        else:
+            extracted_clauses = []
         
         # Format the output dict as clauses map
         clauses_map = {}
-        for clause in extracted_clauses:
-            clause_type = clause.get("clause_type")
-            if clause_type:
-                clauses_map[clause_type] = {
-                    "text": clause.get("text", "Not mentioned"),
-                    "location": clause.get("location", "Not mentioned"),
-                    "present": clause.get("present", False)
-                }
+        if isinstance(extracted_clauses, list):
+            for clause in extracted_clauses:
+                if isinstance(clause, dict):
+                    clause_type = clause.get("clause_type")
+                    if clause_type:
+                        clauses_map[clause_type] = {
+                            "text": str(clause.get("text", "Not mentioned")),
+                            "location": str(clause.get("location", "Not mentioned")),
+                            "present": bool(clause.get("present", False))
+                        }
 
         # Handle any missing target clause types by populating them as Not Mentioned
         for target_type in target_clause_types:

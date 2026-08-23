@@ -59,6 +59,23 @@ class VectorStoreService:
         """
         self.collection.delete(where={"contract_id": contract_id})
 
+    def get_contract_chunks(self, contract_id: int) -> List[Dict[str, Any]]:
+        """Retrieve all indexed chunks and metadata for a specific contract."""
+        results = self.collection.get(where={"contract_id": contract_id})
+        formatted = []
+        if results and "documents" in results and results["documents"]:
+            docs = results["documents"]
+            ids = results["ids"]
+            metadatas = results["metadatas"] or []
+            for idx in range(len(docs)):
+                formatted.append({
+                    "id": ids[idx],
+                    "text": docs[idx],
+                    "chunk_index": metadatas[idx].get("chunk_index") if idx < len(metadatas) else idx,
+                    "contract_id": contract_id,
+                })
+        return formatted
+
     def query_contract_chunks(
         self,
         contract_id: int,

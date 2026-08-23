@@ -22,6 +22,7 @@ interface ContractState {
   setFilterStatus: (status: string) => void;
   setIsLoading: (loading: boolean) => void;
   removeContract: (id: number) => void;
+  clearStore: () => void;
 }
 
 export const useContractStore = create<ContractState>((set) => ({
@@ -41,4 +42,12 @@ export const useContractStore = create<ContractState>((set) => ({
       contracts: state.contracts.filter((c) => c.id !== id),
       activeContractId: state.activeContractId === id ? null : state.activeContractId,
     })),
+  clearStore: () =>
+    set({
+      contracts: [],
+      activeContractId: null,
+      searchQuery: "",
+      filterStatus: "all",
+      isLoading: false,
+    }),
 }));

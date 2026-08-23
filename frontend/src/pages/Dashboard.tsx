@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../services/api";
 import { useContractStore, type Contract } from "../store/useContractStore";
+import { useAuthStore } from "../store/useAuthStore";
 import "./Dashboard.css";
 
 export const Dashboard: React.FC = () => {
@@ -17,12 +18,15 @@ export const Dashboard: React.FC = () => {
   const setFilterStatus = useContractStore((state) => state.setFilterStatus);
   const removeContractFromStore = useContractStore((state) => state.removeContract);
 
+  // User state for tenant isolation
+  const user = useAuthStore((state) => state.user);
+
   // Local View States
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name-asc" | "name-desc">("newest");
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
 
-  // TanStack React Query: Fetch Contracts
+  // TanStack React Query: Fetch Contracts (Strictly Isolated per User)
   const {
     data: contracts = [],
     isLoading,
@@ -30,12 +34,14 @@ export const Dashboard: React.FC = () => {
     error,
     refetch,
   } = useQuery<Contract[]>({
-    queryKey: ["contracts"],
+    queryKey: ["contracts", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const response = await api.get<Contract[]>("/contracts/");
       setContractsInStore(response.data);
       return response.data;
     },
+    enabled: !!user?.id,
   });
 
   // TanStack React Query: Delete Contract Mutation
@@ -46,7 +52,7 @@ export const Dashboard: React.FC = () => {
     },
     onSuccess: (deletedId) => {
       removeContractFromStore(deletedId);
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contracts", user?.id] });
       setContractToDelete(null);
     },
     onError: (err: any) => {
@@ -681,8 +687,7 @@ export const Dashboard: React.FC = () => {
 
             <p style={{ color: "var(--color-text-muted)", fontSize: "0.9rem", lineHeight: "1.5" }}>
               Are you sure you want to delete <strong>"{contractToDelete.filename}"</strong>? This
-              action is permanent and will remove all parsed clauses, risk assessments, and ChromaDB
-              vector embeddings.
+              document and its analysis report will be permanently removed from your vault.
             </p>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px" }}>

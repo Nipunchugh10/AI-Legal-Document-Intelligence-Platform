@@ -1,0 +1,429 @@
+/* ==========================================================================
+   Two-Panel Contract Intelligence Workspace Styling (Day 34)
+   ========================================================================== */
+
+.contract-workspace-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Workspace Top Navigation */
+.workspace-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.workspace-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.workspace-breadcrumbs a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.workspace-breadcrumbs a:hover {
+  color: var(--color-primary);
+}
+
+.workspace-breadcrumbs .crumb-separator {
+  color: var(--color-border);
+}
+
+.workspace-breadcrumbs .crumb-current {
+  color: var(--color-text-main);
+  font-weight: 600;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Two-Panel Workspace Grid Layout */
+.workspace-two-panel-grid {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .workspace-two-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left Panel: Executive Overview */
+.workspace-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contract-meta-card {
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.contract-meta-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.contract-format-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(92, 98, 236, 0.12);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.contract-title-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
+
+.contract-title-wrapper h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.contract-meta-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Action Trigger Card */
+.analysis-trigger-banner {
+  padding: 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(92, 98, 236, 0.08) 0%, rgba(168, 85, 247, 0.06) 100%);
+  border: 1px solid rgba(92, 98, 236, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analysis-trigger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.analysis-trigger-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trigger-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.trigger-status-badge.analyzed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+.trigger-status-badge.pending,
+.trigger-status-badge.ingested {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+/* Metadata Key-Value List */
+.meta-kv-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meta-kv-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+
+.meta-kv-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.meta-kv-value {
+  color: var(--color-text-main);
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Executive Summary Box */
+.executive-summary-box {
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--color-text-main);
+}
+
+.executive-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Right Panel: Tabbed Inspector */
+.workspace-right-panel {
+  border-radius: 18px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab Bar */
+.workspace-tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 0 16px;
+  background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.workspace-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.workspace-tab-btn:hover {
+  color: var(--color-text-main);
+}
+
+.workspace-tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: rgba(92, 98, 236, 0.05);
+  border-radius: 8px 8px 0 0;
+}
+
+.tab-badge-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-muted);
+}
+
+.workspace-tab-btn.active .tab-badge-pill {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Tab Content Container */
+.workspace-tab-body {
+  padding: 24px;
+  min-height: 480px;
+}
+
+/* Document Text Tab */
+.doc-text-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.doc-text-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  width: 240px;
+}
+
+.doc-text-search-box input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-main);
+  font-size: 0.82rem;
+  width: 100%;
+}
+
+.raw-text-viewer-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 0.84rem;
+  line-height: 1.7;
+  color: var(--color-text-main);
+  max-height: 560px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Clauses Tab */
+.clauses-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.clause-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.clause-card:hover {
+  border-color: var(--color-primary);
+}
+
+.clause-card-header {
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.clause-type-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.clause-card-body {
+  padding: 16px 18px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--color-text-main);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Redlines / Strategic Tab */
+.redlines-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.redline-card {
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.redline-clause-tag {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.redline-box {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid var(--color-success);
+  font-size: 0.85rem;
+  color: var(--color-text-main);
+  line-height: 1.5;
+}
+
+.negotiation-tip-box {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}

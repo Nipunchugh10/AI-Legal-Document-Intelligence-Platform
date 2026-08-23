@@ -100,9 +100,9 @@ def answer_question_node(state: QAState) -> Dict[str, Any]:
 
     if not retrieved_texts:
         return {
-            "answer": "This contract has not been processed or ingested yet. I cannot answer questions without ingestion.",
+            "answer": "This contract has not been indexed in the vector database yet. Please click 'Run AI Analysis' or upload the document through the Ingestion Workspace to enable grounded Q&A.",
             "sources": [],
-            "error": "No vector store chunks found for this contract."
+            "error": None
         }
 
     context = "\n\n".join(retrieved_texts)
