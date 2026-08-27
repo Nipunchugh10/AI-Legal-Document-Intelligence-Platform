@@ -14,6 +14,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/useAuthStore";
 import "./App.css";
 
+import { ToastProvider } from "./context/ToastContext";
+
 export const App: React.FC = () => {
   const checkAuth = useAuthStore((state) => state.checkAuth);
 
@@ -29,28 +31,30 @@ export const App: React.FC = () => {
   }, [checkAuth]);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Welcome />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Welcome />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Protected App Shell Routes (Guarded by ProtectedRoute and wrapped in Layout) */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/contracts/upload" element={<UploadPage />} />
-          <Route path="/contracts/:id" element={<ContractDetailPage />} />
-          <Route path="/contracts/:id/ask" element={<QAPage />} />
-          <Route path="/contracts/compare" element={<ComparisonPage />} />
-          <Route path="/security" element={<Security />} />
-          <Route path="/history" element={<HistoryPage />} />
-        </Route>
+          {/* Protected App Shell Routes (Guarded by ProtectedRoute and wrapped in Layout) */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/contracts/upload" element={<UploadPage />} />
+            <Route path="/contracts/:id" element={<ContractDetailPage />} />
+            <Route path="/contracts/:id/ask" element={<QAPage />} />
+            <Route path="/contracts/compare" element={<ComparisonPage />} />
+            <Route path="/security" element={<Security />} />
+            <Route path="/history" element={<HistoryPage />} />
+          </Route>
 
-        {/* Fallback Catch-All Route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Fallback Catch-All Route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 };
 

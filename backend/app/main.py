@@ -21,6 +21,7 @@ from app.api import auth as auth_router
 from app.api import contracts as contracts_router
 from app.api import qa as qa_router
 from app.api import analysis as analysis_router
+from app.api import comparison as comparison_router
 
 # Setup logger for main module
 logger = logging.getLogger(__name__)
@@ -140,6 +141,7 @@ app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
 app.include_router(contracts_router.router, prefix="/contracts", tags=["Contracts"])
 app.include_router(qa_router.router, prefix="/contracts", tags=["Q&A"])
 app.include_router(analysis_router.router, prefix="/contracts", tags=["Orchestration"])
+app.include_router(comparison_router.router, prefix="/contracts", tags=["Comparison"])
 
 
 # ------------------------------------------------------------------

@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
 import { useContractStore } from "../store/useContractStore";
 import { IdleTimer } from "./IdleTimer";
+import { CommandPalette } from "./CommandPalette";
 import "./Layout.css";
 
 interface LayoutProps {
@@ -18,6 +19,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const setSearchQuery = useContractStore((state) => state.setSearchQuery);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     return (localStorage.getItem("theme") as "dark" | "light") || "dark";
   });
@@ -31,6 +34,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       document.documentElement.classList.remove("light-theme");
     }
   }, [theme]);
+
+  // Global Ctrl+K / Cmd+K Command Palette hotkey
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
@@ -61,8 +81,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* 15-minute Inactivity Auto-Logout Tracker with 13-min Warning */}
       <IdleTimer />
 
-      {/* --- Sidebar Navigation --- */}
-      <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
+      {/* Global Command Palette (Cmd+K / Ctrl+K) */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onToggleTheme={toggleTheme}
+        isDarkTheme={theme === "dark"}
+      />
+
+      {/* Mobile Navigation Drawer Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="mobile-drawer-backdrop"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* --- Sidebar Navigation (Desktop & Mobile Drawer) --- */}
+      <aside
+        className={`sidebar ${isCollapsed ? "collapsed" : ""} ${
+          isMobileMenuOpen ? "mobile-open" : ""
+        }`}
+      >
         {/* Sidebar Header */}
         <div className="sidebar-header">
           <div className="sidebar-brand" onClick={() => navigate("/dashboard")}>
@@ -242,7 +282,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
@@ -250,45 +290,32 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </NavLink>
         </nav>
 
-        {/* Sidebar Footer User Profile */}
+        {/* Sidebar Footer / User Profile */}
         <div className="sidebar-footer">
-          <div className="user-profile-widget">
-            <div className="user-avatar" title={user?.email}>
+          <div className="user-profile-summary">
+            <div className="user-avatar-circle" title={user?.email || "User"}>
               {userInitial}
             </div>
             {!isCollapsed && (
-              <div className="user-meta-details">
-                <div className="user-meta-email" title={user?.email}>
-                  {user?.email || "User Account"}
-                </div>
-                <div className="user-badge-2fa">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                  {user?.is_2fa_enabled ? "2FA Protected" : "Standard Auth"}
-                </div>
+              <div className="user-text-info">
+                <span className="user-email-display" title={user?.email}>
+                  {user?.email || "Signed In"}
+                </span>
+                <span className="user-role-badge">
+                  {user?.is_2fa_enabled ? "🛡️ 2FA Verified" : "Standard Account"}
+                </span>
               </div>
             )}
             <button
-              className="btn-logout-compact"
+              className="btn-logout-sidebar"
               onClick={handleLogout}
               title="Sign Out"
               aria-label="Sign Out"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -310,14 +337,39 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Top Header Bar */}
         <header className="top-header">
           <div className="top-header-left">
+            {/* Mobile Drawer Hamburger Button */}
+            <button
+              className="btn-mobile-menu-toggle"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Open Navigation Menu"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+
             <div className="breadcrumb-trail">
               <span>Workspace</span>
               <span>/</span>
               <span className="breadcrumb-active">{getBreadcrumb()}</span>
             </div>
 
-            {/* Quick Search */}
-            <div className="header-search-bar">
+            {/* Quick Search & Command Palette Trigger */}
+            <div
+              className="header-search-bar"
+              onClick={() => setIsPaletteOpen(true)}
+              title="Click or press Ctrl+K to open Command Palette"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -326,17 +378,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
               >
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input
                 type="text"
-                placeholder="Search contracts..."
+                placeholder="Search contracts or press ⌘K..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                readOnly
               />
               <span className="search-kbd-pill">⌘K</span>
             </div>
@@ -365,8 +416,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
                   <circle cx="12" cy="12" r="5" />
                   <line x1="12" y1="1" x2="12" y2="3" />
@@ -387,8 +436,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
@@ -408,8 +455,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
               >
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
@@ -424,6 +469,39 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children || <Outlet />}
         </main>
       </div>
+
+      {/* --- Mobile Bottom Navigation Bar (< 768px) --- */}
+      <nav className="mobile-bottom-nav">
+        <NavLink to="/dashboard" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+          </svg>
+          <span>Vault</span>
+        </NavLink>
+        <NavLink to="/contracts/upload" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <span>Upload</span>
+        </NavLink>
+        <NavLink to="/contracts/compare" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 3h5v5" />
+            <path d="M8 3H3v5" />
+            <path d="M12 21V9" />
+          </svg>
+          <span>Compare</span>
+        </NavLink>
+        <NavLink to="/security" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>Security</span>
+        </NavLink>
+      </nav>
     </div>
   );
 };

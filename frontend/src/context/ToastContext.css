@@ -1,0 +1,106 @@
+/* ==========================================================================
+   Global Toast Notifications Styling (Day 37)
+   ========================================================================== */
+
+.toast-portal-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: 420px;
+  width: calc(100vw - 48px);
+}
+
+.toast-notification-item {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--color-surface-card, #131722);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  color: var(--color-text-main, #ffffff);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.toast-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-message-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toast-close-btn:hover {
+  color: var(--color-text-main, #ffffff);
+}
+
+/* Toast Variant Themes */
+.toast-notification-item.success {
+  border-left: 4px solid #10b981;
+}
+
+.toast-notification-item.success .toast-icon-wrapper {
+  color: #10b981;
+}
+
+.toast-notification-item.error {
+  border-left: 4px solid #f43f5e;
+}
+
+.toast-notification-item.error .toast-icon-wrapper {
+  color: #f43f5e;
+}
+
+.toast-notification-item.warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.toast-notification-item.warning .toast-icon-wrapper {
+  color: #f59e0b;
+}
+
+.toast-notification-item.info {
+  border-left: 4px solid #5c62ec;
+}
+
+.toast-notification-item.info .toast-icon-wrapper {
+  color: #5c62ec;
+}

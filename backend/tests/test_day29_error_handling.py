@@ -36,13 +36,13 @@ def test_global_exception_handler(caplog):
     assert response.json() == {"detail": "Simulated Forbidden Error"}
 
 
-@patch("app.services.llm_provider._call_gemini_with_retry")
-def test_llm_gemini_success(mock_gemini_retry, caplog):
+@patch("app.services.llm_provider._generate_with_model_cascade")
+def test_llm_gemini_success(mock_gemini_cascade, caplog):
     """
     Verifies that a successful Gemini LLM call logs the request starting,
     the serving provider (Gemini), the contract ID, and returns the response.
     """
-    mock_gemini_retry.return_value = "Gemini response text"
+    mock_gemini_cascade.return_value = "Gemini response text"
 
     with caplog.at_level(logging.INFO):
         response = get_llm_response("Test prompt", contract_id=999)
@@ -55,13 +55,13 @@ def test_llm_gemini_success(mock_gemini_retry, caplog):
         assert any("LLM call served by provider=Gemini for contract_id=999" in record.message for record in caplog.records)
 
 
-@patch("app.services.llm_provider._call_gemini_with_retry")
-def test_llm_gemini_failure(mock_gemini_retry, caplog):
+@patch("app.services.llm_provider._generate_with_model_cascade")
+def test_llm_gemini_failure(mock_gemini_cascade, caplog):
     """
-    Verifies that when Gemini LLM call fails completely (all retries exhausted),
+    Verifies that when Gemini LLM call fails completely (all fallbacks exhausted),
     the exception is logged and propagated up.
     """
-    mock_gemini_retry.side_effect = Exception("Simulated API failure")
+    mock_gemini_cascade.side_effect = Exception("Simulated API failure")
 
     with pytest.raises(Exception) as exc_info:
         get_llm_response("Test prompt", contract_id=999)
@@ -69,4 +69,4 @@ def test_llm_gemini_failure(mock_gemini_retry, caplog):
     assert "Simulated API failure" in str(exc_info.value)
     
     with caplog.at_level(logging.ERROR):
-        assert any("Primary LLM API call (Gemini) failed: Simulated API failure" in record.message for record in caplog.records)
+        assert any("All Gemini LLM models failed for contract_id=999: Simulated API failure" in record.message for record in caplog.records)

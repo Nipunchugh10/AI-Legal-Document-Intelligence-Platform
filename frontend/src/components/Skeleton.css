@@ -1,0 +1,73 @@
+/* ==========================================================================
+   Skeleton Shimmer Loading Animation Styling (Day 37)
+   ========================================================================== */
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 37%,
+    rgba(255, 255, 255, 0.04) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease infinite;
+}
+
+:root.light-theme .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 37%,
+    rgba(0, 0, 0, 0.04) 63%
+  );
+  background-size: 400% 100%;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.skeleton-card-container {
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--color-surface-card, #131722);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.skeleton-table-container {
+  border-radius: 14px;
+  background: var(--color-surface-card, #131722);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  overflow: hidden;
+}
+
+.skeleton-table-header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--color-surface-elevated, #1a2030);
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+}
+
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.04));
+}

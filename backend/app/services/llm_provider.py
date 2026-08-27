@@ -83,6 +83,7 @@ def get_llm_response(prompt: str, temperature: float = 0.0, contract_id: int | N
     
     try:
         response = _generate_with_model_cascade(prompt, temperature)
+        logger.info("LLM call served by provider=Gemini for contract_id=%s", cid_str)
         return response
     except Exception as e:
         logger.error("All Gemini LLM models failed for contract_id=%s: %s", cid_str, str(e))
