@@ -8,6 +8,7 @@ import { UploadPage } from "./pages/UploadPage";
 import { ContractDetailPage } from "./pages/ContractDetailPage";
 import { QAPage } from "./pages/QAPage";
 import { ComparisonPage } from "./pages/ComparisonPage";
+import { SearchPage } from "./pages/SearchPage";
 import { Security } from "./pages/Security";
 import { HistoryPage } from "./pages/HistoryPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -46,6 +47,7 @@ export const App: React.FC = () => {
             <Route path="/contracts/:id" element={<ContractDetailPage />} />
             <Route path="/contracts/:id/ask" element={<QAPage />} />
             <Route path="/contracts/compare" element={<ComparisonPage />} />
+            <Route path="/search" element={<SearchPage />} />
             <Route path="/security" element={<Security />} />
             <Route path="/history" element={<HistoryPage />} />
           </Route>

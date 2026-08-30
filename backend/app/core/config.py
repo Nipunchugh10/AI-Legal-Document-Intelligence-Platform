@@ -39,9 +39,13 @@ class Settings(BaseSettings):
     # SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL
     # (Currently using console mock for local development)
 
-    # --- AI / LLM (Google Gemini) ---
+    # --- AI / LLM (100% Free Tier Google Gemini) ---
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
+
+    # --- AI Free Tier Quota Limits & Alerts ---
+    AI_FREE_TIER_DAILY_LIMIT: int = 1500
+    AI_WARNING_THRESHOLD_PERCENT: float = 80.0
 
     # --- LangSmith Tracing (Day 29) ---
     LANGCHAIN_TRACING_V2: str = "false"

@@ -4,7 +4,7 @@ export interface Contract {
   id: number;
   filename: string;
   upload_path: string;
-  status: "pending" | "ingested" | "analyzed" | "failed";
+  status: "pending" | "ingested" | "processing" | "analyzed" | "failed";
   created_at: string;
   file_size?: number;
   document_type?: string;

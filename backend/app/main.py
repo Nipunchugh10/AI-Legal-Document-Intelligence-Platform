@@ -22,6 +22,8 @@ from app.api import contracts as contracts_router
 from app.api import qa as qa_router
 from app.api import analysis as analysis_router
 from app.api import comparison as comparison_router
+from app.api import search as search_router
+from app.api import admin as admin_router
 
 # Setup logger for main module
 logger = logging.getLogger(__name__)
@@ -104,6 +106,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ------------------------------------------------------------------
+# Response Compression & Performance Middleware — Day 43
+# ------------------------------------------------------------------
+from fastapi.middleware.gzip import GZipMiddleware
+import time
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """Measures total processing time and injects X-Process-Time response header."""
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    response.headers["X-Process-Time"] = f"{process_time * 1000:.2f}ms"
+    return response
+
 
 # ------------------------------------------------------------------
 # Global Exception Handler — Day 29
@@ -138,10 +157,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Routers — Day 4 (more routers added in subsequent days)
 # ------------------------------------------------------------------
 app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
+app.include_router(search_router.router, prefix="/contracts", tags=["Search"])
+app.include_router(comparison_router.router, prefix="/contracts", tags=["Comparison"])
 app.include_router(contracts_router.router, prefix="/contracts", tags=["Contracts"])
 app.include_router(qa_router.router, prefix="/contracts", tags=["Q&A"])
 app.include_router(analysis_router.router, prefix="/contracts", tags=["Orchestration"])
-app.include_router(comparison_router.router, prefix="/contracts", tags=["Comparison"])
+app.include_router(admin_router.router, prefix="/admin", tags=["Admin & Telemetry"])
 
 
 # ------------------------------------------------------------------

@@ -17,7 +17,7 @@ Day 3 — Database Design and Migrations
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from app.core.database import Base
@@ -27,6 +27,9 @@ class Analysis(Base):
     """Stores the JSON result of one analysis operation on a contract."""
 
     __tablename__ = "analyses"
+    __table_args__ = (
+        Index("ix_analyses_contract_id_analysis_type", "contract_id", "analysis_type"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     contract_id: Mapped[int] = mapped_column(

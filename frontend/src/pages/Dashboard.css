@@ -486,3 +486,58 @@
   box-shadow: var(--shadow-lg);
   animation: scaleUp 0.2s ease-out;
 }
+
+/* --- Search Jump Banner --- */
+.vault-search-jump-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(92, 98, 236, 0.12) 0%, rgba(92, 98, 236, 0.04) 100%);
+  border: 1px solid rgba(92, 98, 236, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vault-search-jump-banner:hover {
+  border-color: rgba(92, 98, 236, 0.45);
+  background: linear-gradient(135deg, rgba(92, 98, 236, 0.18) 0%, rgba(92, 98, 236, 0.08) 100%);
+  transform: translateY(-1px);
+}
+
+.search-jump-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.search-jump-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(92, 98, 236, 0.2);
+  color: var(--color-primary, #5c62ec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.search-jump-title {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--color-text-main, #ffffff);
+}
+
+.search-jump-desc {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--color-text-muted, #94a3b8);
+  margin-top: 2px;
+}
+

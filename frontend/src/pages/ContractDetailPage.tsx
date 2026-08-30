@@ -7,7 +7,7 @@ interface ContractInfo {
   id: number;
   filename: string;
   upload_path: string;
-  status: "pending" | "ingested" | "analyzed" | "failed";
+  status: "pending" | "ingested" | "processing" | "analyzed" | "failed";
   created_at: string;
 }
 
@@ -120,6 +120,44 @@ export const ContractDetailPage: React.FC = () => {
     fetchWorkspaceData();
   }, [id]);
 
+  // Polling hook when contract is processing in background
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    if (contract?.status === "processing" || isAnalyzing) {
+      interval = setInterval(async () => {
+        try {
+          const res = await api.get<ContractInfo>(`/contracts/${id}`);
+          if (res.data.status === "analyzed") {
+            setContract(res.data);
+            setIsAnalyzing(false);
+            // Fetch completed analysis payload & raw text
+            const [analysisRes, textRes] = await Promise.allSettled([
+              api.get<AnalysisPayload>(`/contracts/${id}/analysis`),
+              api.get<{ text: string }>(`/contracts/${id}/text`),
+            ]);
+            if (analysisRes.status === "fulfilled" && analysisRes.value.data) {
+              setAnalysisData(analysisRes.value.data);
+            }
+            if (textRes.status === "fulfilled" && textRes.value.data?.text) {
+              setRawText(textRes.value.data.text);
+            }
+          } else if (res.data.status === "failed") {
+            setContract(res.data);
+            setIsAnalyzing(false);
+            setErrorMsg("Background contract analysis encountered an issue. Please click 'Re-Run Multi-Agent Analysis'.");
+          }
+        } catch {
+          // Ignore transient polling failure
+        }
+      }, 2500);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [contract?.status, isAnalyzing, id]);
+
   const handleRunAnalysis = async (force: boolean = false) => {
     if (!id) return;
     setIsAnalyzing(true);
@@ -127,10 +165,17 @@ export const ContractDetailPage: React.FC = () => {
 
     try {
       const response = await api.post<AnalysisPayload>(`/contracts/${id}/analyze?force=${force}`);
-      setAnalysisData(response.data);
-
-      if (contract) {
-        setContract({ ...contract, status: "analyzed" });
+      if (response.data.status === "analyzed") {
+        setAnalysisData(response.data);
+        if (contract) {
+          setContract({ ...contract, status: "analyzed" });
+        }
+        setIsAnalyzing(false);
+      } else {
+        // Status is processing in background
+        if (contract) {
+          setContract({ ...contract, status: "processing" });
+        }
       }
 
       try {
@@ -142,14 +187,13 @@ export const ContractDetailPage: React.FC = () => {
         // Ignore text fetch error
       }
     } catch (err: any) {
+      setIsAnalyzing(false);
       const rawDetail = err.response?.data?.detail || err.message || "Multi-Agent Analysis failed.";
       if (typeof rawDetail === "string" && (rawDetail.includes("429") || rawDetail.toLowerCase().includes("quota"))) {
         setErrorMsg("Google AI rate limit reached. Please wait a few seconds while fallback models initialize, then click Re-Run.");
       } else {
         setErrorMsg(typeof rawDetail === "string" ? rawDetail.slice(0, 200) : "Multi-Agent Analysis failed. Please try again.");
       }
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -674,6 +718,25 @@ ${(analysisData.compliance_issues || [])
                   <div className="executive-summary-prose">
                     {analysisData?.summary ? (
                       analysisData.summary
+                    ) : (contract.status === "processing" || isAnalyzing) ? (
+                      <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", textAlign: "center" }}>
+                        <div className="spinner" style={{ width: "36px", height: "36px" }} />
+                        <div>
+                          <h4 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--color-text-main)", marginBottom: "4px" }}>
+                            Multi-Agent Legal Analysis in Progress...
+                          </h4>
+                          <p style={{ fontSize: "0.86rem", color: "var(--color-text-muted)", maxWidth: "460px" }}>
+                            Our 5-agent LangGraph orchestrator is parsing clauses, assessing 3-tier IRAC risks, and running statutory compliance audits in the background.
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center", marginTop: "8px" }}>
+                          <span className="tab-badge-pill" style={{ background: "rgba(92, 98, 236, 0.15)", color: "var(--color-primary)" }}>1. Document Parser</span>
+                          <span className="tab-badge-pill" style={{ background: "rgba(92, 98, 236, 0.15)", color: "var(--color-primary)" }}>2. Clause Extractor</span>
+                          <span className="tab-badge-pill" style={{ background: "rgba(92, 98, 236, 0.15)", color: "var(--color-primary)" }}>3. IRAC Risk Agent</span>
+                          <span className="tab-badge-pill" style={{ background: "rgba(92, 98, 236, 0.15)", color: "var(--color-primary)" }}>4. Statutory Compliance</span>
+                          <span className="tab-badge-pill" style={{ background: "rgba(92, 98, 236, 0.15)", color: "var(--color-primary)" }}>5. Senior Partner Synthesis</span>
+                        </div>
+                      </div>
                     ) : (
                       <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--color-text-muted)" }}>
                         <p>No analysis generated yet. Click "Run AI Legal Analysis" to trigger multi-agent review.</p>

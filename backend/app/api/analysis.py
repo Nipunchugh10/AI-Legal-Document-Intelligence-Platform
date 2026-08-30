@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Any
@@ -15,6 +15,7 @@ from app.schemas.contract import AnalysisWorkflowResponse
 from app.agents.workflow import build_analysis_workflow
 from app.agents.base import ContractAnalysisState
 from app.services.pdf_extractor import extract_pdf_text
+from app.services.analysis_task import run_analysis_workflow_task
 
 router = APIRouter()
 
@@ -39,16 +40,18 @@ def _save_analysis_record(db: Session, contract_id: int, analysis_type: str, res
     "/{contract_id}/analyze",
     response_model=AnalysisWorkflowResponse,
     status_code=status.HTTP_200_OK,
-    summary="Run full contract analysis workflow",
+    summary="Run full contract analysis workflow (Async Background Processing)",
     description=(
-        "Executes the full contract analysis orchestrator LangGraph, combining "
-        "document type classification, clause extraction, risk assessment, compliance checks, "
-        "and executive summary generation into a single end-to-end pipeline."
+        "Executes the full contract analysis orchestrator LangGraph. "
+        "By default, runs in background via BackgroundTasks, setting contract status to 'processing'. "
+        "Pass sync=true to execute synchronously."
     ),
 )
 async def run_full_analysis(
     contract_id: int,
+    background_tasks: BackgroundTasks,
     force: bool = False,
+    sync: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -66,31 +69,55 @@ async def run_full_analysis(
         )
 
     # 2. Check cache (database) to bypass expensive LLM calls if all analyses exist
-    parsing_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent").first()
-    clauses_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses").first()
-    risks_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "risks").first()
-    compliance_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "compliance").first()
-    summary_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "summary").first()
+    if not force:
+        target_types = ["parsing_agent", "clauses", "risks", "compliance", "summary"]
+        records = (
+            db.query(Analysis)
+            .filter(Analysis.contract_id == contract_id, Analysis.analysis_type.in_(target_types))
+            .all()
+        )
+        res_map = {r.analysis_type: r.result_json for r in records if isinstance(r.result_json, dict)}
 
-    if not force and parsing_record and clauses_record and risks_record and compliance_record and summary_record:
-        p_res = parsing_record.result_json
+        if len(res_map) == 5:
+            p_res = res_map.get("parsing_agent", {})
+            return AnalysisWorkflowResponse(
+                contract_id=contract_id,
+                status=contract.status or "analyzed",
+                document_type=p_res.get("document_type", "Legal Contract"),
+                metadata={
+                    "party_a": p_res.get("party_a", "Not mentioned"),
+                    "party_b": p_res.get("party_b", "Not mentioned"),
+                    "effective_date": p_res.get("effective_date", "Not mentioned"),
+                    "jurisdiction": p_res.get("jurisdiction", "Not mentioned"),
+                },
+                clauses=res_map.get("clauses", {}),
+                risks=res_map.get("risks", {}).get("risks", []) if isinstance(res_map.get("risks"), dict) else [],
+                compliance_issues=res_map.get("compliance", {}).get("compliance_issues", []) if isinstance(res_map.get("compliance"), dict) else [],
+                summary=res_map.get("summary", {}).get("summary", "") if isinstance(res_map.get("summary"), dict) else "",
+            )
+
+    # 3. Async Background Task Mode (Default)
+    if not sync:
+        contract.status = "processing"
+        db.commit()
+        background_tasks.add_task(run_analysis_workflow_task, contract_id, current_user.id)
         return AnalysisWorkflowResponse(
             contract_id=contract_id,
-            status=contract.status,
-            document_type=p_res.get("document_type", "Legal Contract"),
+            status="processing",
+            document_type="Analyzing...",
             metadata={
-                "party_a": p_res.get("party_a", "Not mentioned"),
-                "party_b": p_res.get("party_b", "Not mentioned"),
-                "effective_date": p_res.get("effective_date", "Not mentioned"),
-                "jurisdiction": p_res.get("jurisdiction", "Not mentioned"),
+                "party_a": "Analyzing...",
+                "party_b": "Analyzing...",
+                "effective_date": "Analyzing...",
+                "jurisdiction": "Analyzing...",
             },
-            clauses=clauses_record.result_json,
-            risks=risks_record.result_json.get("risks", []),
-            compliance_issues=compliance_record.result_json.get("compliance_issues", []),
-            summary=summary_record.result_json.get("summary", ""),
+            clauses={},
+            risks=[],
+            compliance_issues=[],
+            summary="Contract analysis has been queued and is executing in the background. Poll GET /contracts/{id} or /contracts/{id}/analysis for progress.",
         )
 
-    # 3. Retrieve raw text analysis or extract if missing
+    # 4. Synchronous Mode (sync=True)
     raw_text_record = (
         db.query(Analysis)
         .filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "raw_text")
@@ -209,14 +236,20 @@ async def run_full_analysis(
     "/{contract_id}/analysis",
     response_model=AnalysisWorkflowResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get existing analysis results for a contract",
+    summary="Get existing analysis results for a contract (Optimized Batch & Memory Cached)",
 )
 async def get_contract_analysis(
     contract_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Retrieves persisted analysis findings from PostgreSQL without triggering LLM calls."""
+    """Retrieves persisted analysis findings with in-memory caching and single-query batching."""
+    from app.core.cache import memory_cache
+    cache_key = f"analysis:{current_user.id}:{contract_id}"
+    cached_response = memory_cache.get(cache_key)
+    if cached_response:
+        return cached_response
+
     contract = (
         db.query(Contract)
         .filter(Contract.id == contract_id, Contract.user_id == current_user.id)
@@ -228,25 +261,28 @@ async def get_contract_analysis(
             detail="Contract not found or not owned by user.",
         )
 
-    parsing_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "parsing_agent").first()
-    clauses_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "clauses").first()
-    risks_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "risks").first()
-    compliance_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "compliance").first()
-    summary_record = db.query(Analysis).filter(Analysis.contract_id == contract_id, Analysis.analysis_type == "summary").first()
+    # Single-batch query for all 5 analysis records (N+1 Optimization)
+    target_types = ["parsing_agent", "clauses", "risks", "compliance", "summary"]
+    records = (
+        db.query(Analysis)
+        .filter(Analysis.contract_id == contract_id, Analysis.analysis_type.in_(target_types))
+        .all()
+    )
+    res_map = {r.analysis_type: r.result_json for r in records if isinstance(r.result_json, dict)}
 
-    if not (parsing_record or clauses_record or risks_record or summary_record):
+    if not res_map:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No analysis found for this contract. Please run analysis first.",
         )
 
-    p_res = parsing_record.result_json if parsing_record and isinstance(parsing_record.result_json, dict) else {}
-    c_res = clauses_record.result_json if clauses_record and isinstance(clauses_record.result_json, dict) else {}
-    r_res = risks_record.result_json if risks_record and isinstance(risks_record.result_json, dict) else {}
-    comp_res = compliance_record.result_json if compliance_record and isinstance(compliance_record.result_json, dict) else {}
-    s_res = summary_record.result_json if summary_record and isinstance(summary_record.result_json, dict) else {}
+    p_res = res_map.get("parsing_agent", {})
+    c_res = res_map.get("clauses", {})
+    r_res = res_map.get("risks", {})
+    comp_res = res_map.get("compliance", {})
+    s_res = res_map.get("summary", {})
 
-    return AnalysisWorkflowResponse(
+    response = AnalysisWorkflowResponse(
         contract_id=contract_id,
         status=contract.status,
         document_type=p_res.get("document_type", "Legal Contract"),
@@ -261,6 +297,11 @@ async def get_contract_analysis(
         compliance_issues=comp_res.get("compliance_issues", []) if isinstance(comp_res, dict) else [],
         summary=s_res.get("summary", "") if isinstance(s_res, dict) else "",
     )
+
+    if contract.status == "analyzed":
+        memory_cache.set(cache_key, response, ttl_seconds=300)
+
+    return response
 
 
 @router.get(

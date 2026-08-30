@@ -12,7 +12,7 @@ def test_llm_provider_response():
         assert isinstance(response, str)
         assert len(response) > 0
     except Exception as e:
-        if "429" in str(e) or "quota" in str(e).lower():
+        if "429" in str(e) or "quota" in str(e).lower() or "rate limit" in str(e).lower():
             pytest.skip("Skipping live LLM network test due to Gemini API rate limit reset window.")
         else:
             raise e

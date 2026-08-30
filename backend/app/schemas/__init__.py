@@ -11,6 +11,11 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.schemas.contract import ContractResponse
+from app.schemas.search import (
+    SearchChunkResult,
+    ContractSearchResult,
+    SemanticSearchResponse,
+)
 
 __all__ = [
     "RegisterRequest",
@@ -18,4 +23,7 @@ __all__ = [
     "TokenResponse",
     "UserResponse",
     "ContractResponse",
+    "SearchChunkResult",
+    "ContractSearchResult",
+    "SemanticSearchResponse",
 ]

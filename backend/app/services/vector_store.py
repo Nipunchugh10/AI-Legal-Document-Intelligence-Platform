@@ -119,6 +119,65 @@ class VectorStoreService:
 
         return formatted_results
 
+    def query_user_contracts(
+        self,
+        contract_ids: List[int],
+        query_text: str,
+        n_results: int = 25,
+        min_similarity: float = 0.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform a semantic similarity search across multiple contract chunks in ChromaDB.
+        Filters by a list of contract IDs belonging to the authenticated user.
+        """
+        if not contract_ids:
+            return []
+
+        # 1. Generate query embedding
+        query_embedding = self.embedder.embed_text(query_text)
+
+        # 2. Build ChromaDB where filter
+        if len(contract_ids) == 1:
+            where_filter = {"contract_id": contract_ids[0]}
+        else:
+            where_filter = {"contract_id": {"$in": contract_ids}}
+
+        # Check count of items in collection to avoid requesting more than available
+        count = self.collection.count()
+        if count == 0:
+            return []
+
+        effective_n_results = min(n_results, count)
+
+        # 3. Query ChromaDB collection
+        results = self.collection.query(
+            query_embeddings=[query_embedding],
+            n_results=effective_n_results,
+            where=where_filter,
+        )
+
+        formatted_results = []
+        if results and "documents" in results and results["documents"]:
+            documents = results["documents"][0]
+            ids = results["ids"][0]
+            metadatas = results["metadatas"][0]
+            distances = results["distances"][0] if "distances" in results else [0.0] * len(documents)
+
+            for idx in range(len(documents)):
+                similarity = 1.0 - distances[idx]
+                if similarity >= min_similarity:
+                    formatted_results.append({
+                        "id": ids[idx],
+                        "text": documents[idx],
+                        "chunk_index": metadatas[idx].get("chunk_index") if metadatas and idx < len(metadatas) else idx,
+                        "contract_id": metadatas[idx].get("contract_id") if metadatas and idx < len(metadatas) else None,
+                        "similarity": round(float(similarity), 4),
+                    })
+
+        # Sort descending by similarity
+        formatted_results.sort(key=lambda x: x["similarity"], reverse=True)
+        return formatted_results
+
     def add_knowledge_chunks(
         self,
         document_name: str,

@@ -281,9 +281,9 @@ def test_analysis_workflow_endpoint(
         db.add(raw_analysis)
         db.commit()
 
-        # Call POST /contracts/{contract_id}/analyze
+        # Call POST /contracts/{contract_id}/analyze (synchronous mode)
         headers = {"Authorization": auth_header}
-        response = client.post(f"/contracts/{contract_id}/analyze", headers=headers)
+        response = client.post(f"/contracts/{contract_id}/analyze?sync=true", headers=headers)
         assert response.status_code == 200, f"Endpoint failed: {response.text}"
         
         data = response.json()

@@ -78,6 +78,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         },
       },
       {
+        id: "nav-search",
+        title: "Semantic Contract Search",
+        category: "Navigation",
+        icon: "🔍",
+        subtext: "Search clauses and fine print with vector AI",
+        onSelect: () => {
+          navigate("/search");
+          onClose();
+        },
+      },
+      {
         id: "nav-compare",
         title: "Compare Contract Versions",
         category: "Navigation",

@@ -42,6 +42,11 @@ export const Dashboard: React.FC = () => {
       return response.data;
     },
     enabled: !!user?.id,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasProcessing = Array.isArray(data) && data.some((c) => c.status === "processing" || c.status === "pending");
+      return hasProcessing ? 3000 : false;
+    },
   });
 
   // TanStack React Query: Delete Contract Mutation
@@ -287,6 +292,42 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* ── Quick AI Semantic Search Trigger Banner ─────────────────────── */}
+      <div className="vault-search-jump-banner" onClick={() => navigate("/search")}>
+        <div className="search-jump-left">
+          <div className="search-jump-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <div>
+            <span className="search-jump-title">AI Semantic Clause & Obligation Search</span>
+            <span className="search-jump-desc">
+              Find indemnity caps, non-competes, or hidden liability traps across all contracts using natural language
+            </span>
+          </div>
+        </div>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate("/search");
+          }}
+          type="button"
+        >
+          Open Semantic Search &rarr;
+        </button>
+      </div>
 
       {/* ── 3. Control & Filter Toolbar ────────────────────────────────────── */}
       <section className="vault-control-bar">
