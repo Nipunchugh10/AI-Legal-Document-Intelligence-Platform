@@ -3,26 +3,27 @@
 # Backend Dependencies
 # ==============================================
 
-# --- Web Framework ---
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
+# --- Web Framework & Gradio ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.6
+gradio>=6.0.0
 
-# --- Database ---
-sqlalchemy==2.0.35
-alembic==1.13.2
-psycopg2-binary==2.9.9
+# --- Database & Migrations ---
+sqlalchemy>=2.0.35
+alembic>=1.13.2
+psycopg2-binary>=2.9.9
 
-# --- Data Validation & Config ---
-pydantic==2.9.2
-pydantic-settings==2.5.2
-python-dotenv==1.0.1
+# --- Data Validation & Configuration ---
+pydantic>=2.9.2
+pydantic-settings>=2.5.2
+python-dotenv>=1.0.1
 
-# --- Authentication ---
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.2.1          # pin to 4.x — bcrypt 5.x is incompatible with passlib 1.7.4
-email-validator==2.3.0 # required for Pydantic EmailStr (added Day 4)
-slowapi==0.1.10        # rate limiting for auth endpoints (Day 54)
+# --- Security, Authentication & Rate Limiting ---
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0
+email-validator>=2.2.0
+slowapi>=0.1.9
 
 # --- OpenTelemetry & Observability (Day 55) ---
 opentelemetry-api>=1.20.0
@@ -30,37 +31,30 @@ opentelemetry-sdk>=1.20.0
 opentelemetry-instrumentation-fastapi>=0.45b0
 opentelemetry-instrumentation-sqlalchemy>=0.45b0
 
-# --- File Uploads ---
-python-multipart==0.0.12
+# --- File Uploads & Forms ---
+python-multipart>=0.0.12
 
-# --- AI / LLM ---
+# --- Google Gemini AI / LLM & Auth ---
 google-generativeai>=0.8.0
+google-auth>=2.35.0
 
-# --- Google OAuth Verification ---
-google-auth==2.35.0
-
-# --- Document & Image Processing (PDF, Scans, Photos, Word) ---
-pymupdf==1.24.10
-pdfplumber==0.11.4
+# --- Document & Image Processing ---
+pymupdf>=1.24.10
+pdfplumber>=0.11.4
 Pillow>=10.0.0
 python-docx>=1.1.0
 
-
-# --- Text Chunking (Day 17) ---
+# --- Text Chunking & Vector Search ---
 langchain-text-splitters>=0.2.0
 tiktoken>=0.7.0
-
-# --- Vector Database (Day 18) ---
 chromadb>=0.5.0
 
-# --- LangGraph & Agent Pipeline (Day 20) ---
+# --- LangGraph & Multi-Agent Pipeline ---
 langgraph>=0.2.0
 langchain>=0.3.0
 langchain-google-genai>=2.0.0
 tenacity>=8.2.0
-# --- Hugging Face Spaces & Gradio Companion UI (Day 54) ---
-gradio>=6.0.0
-PyYAML>=6.0.0
 
-# --- Testing ---
+# --- Testing & Config ---
 pytest>=8.0.0
+PyYAML>=6.0.0
