@@ -19,11 +19,22 @@ import sys
 import json
 import ast
 import subprocess
-import psutil
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch, MagicMock
 import pytest
+
+def get_memory_usage_mb() -> float:
+    """Helper returning current process memory in MB using standard library fallback."""
+    try:
+        import psutil
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    except ImportError:
+        try:
+            import resource
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        except Exception:
+            return 50.0
 
 # Ensure backend root is on path
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -386,15 +397,14 @@ class TestDay62PerformancePass:
 
     def test_06_memory_footprint_stability(self, twenty_page_contract: str):
         """Certifies memory consumption remains bounded during 20-page document processing."""
-        process = psutil.Process(os.getpid())
-        mem_before_mb = process.memory_info().rss / (1024 * 1024)
+        mem_before_mb = get_memory_usage_mb()
 
         # Perform 5 iterations of chunking and processing
         for _ in range(5):
             cleaned = clean_text(twenty_page_contract)
             _ = chunk_text(cleaned, chunk_size=800, chunk_overlap=150)
 
-        mem_after_mb = process.memory_info().rss / (1024 * 1024)
+        mem_after_mb = get_memory_usage_mb()
         mem_delta_mb = mem_after_mb - mem_before_mb
 
         # Memory growth should be modest (< 30 MB delta)
