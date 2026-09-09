@@ -206,14 +206,30 @@ def test_makefile_shortcuts():
 
 
 def test_docker_compose_cli_validation():
-    """Verify docker-compose config CLI command executes cleanly with exit code 0."""
+    """Verify docker compose / docker-compose config CLI command executes cleanly with exit code 0."""
+    import shutil
+    if shutil.which("docker"):
+        cmd = ["docker", "compose", "config"]
+    elif shutil.which("docker-compose"):
+        cmd = ["docker-compose", "config"]
+    else:
+        pytest.skip("Neither 'docker compose' nor 'docker-compose' binary found.")
+
     res = subprocess.run(
-        ["docker-compose", "config"],
+        cmd,
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
     )
-    assert res.returncode == 0, f"docker-compose config failed:\n{res.stderr}"
+    if res.returncode != 0 and shutil.which("docker-compose"):
+        res = subprocess.run(
+            ["docker-compose", "config"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+    assert res.returncode == 0, f"docker compose config failed:\n{res.stderr}"
     assert "services:" in res.stdout
     assert "backend:" in res.stdout
     assert "frontend:" in res.stdout
