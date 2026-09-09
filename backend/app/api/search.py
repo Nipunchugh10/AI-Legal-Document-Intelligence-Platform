@@ -8,13 +8,15 @@ and returns ranked contract matches with cited excerpts and metadata.
 
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.audit_events import AuditEventType
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.search import SemanticSearchResponse
+from app.services.audit_logger import log_activity
 from app.services.search_service import SearchService
 
 router = APIRouter()
@@ -32,6 +34,7 @@ router = APIRouter()
     ),
 )
 async def search_contracts(
+    request: Request,
     q: str = Query(..., min_length=1, description="Semantic search query string"),
     limit: int = Query(10, ge=1, le=50, description="Maximum number of contracts to return"),
     document_type: Optional[str] = Query(None, description="Filter by document type (e.g., NDA, Employment, Lease)"),
@@ -46,7 +49,7 @@ async def search_contracts(
     """
     Search all contracts owned by the authenticated user using vector embeddings.
     """
-    return SearchService.search_user_contracts(
+    results = SearchService.search_user_contracts(
         db=db,
         user_id=current_user.id,
         query=q,
@@ -58,3 +61,18 @@ async def search_contracts(
         contract_id=contract_id,
         min_similarity=min_similarity,
     )
+
+    log_activity(
+        db=db,
+        action=AuditEventType.SEARCH_PERFORMED.value,
+        user_id=current_user.id,
+        metadata={
+            "query": q,
+            "total_contracts_matched": results.total_contracts_matched,
+            "total_chunks_matched": results.total_chunks_matched,
+        },
+        request=request,
+    )
+
+    return results
+

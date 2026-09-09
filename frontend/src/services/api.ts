@@ -1,7 +1,10 @@
 import axios from "axios";
 
 // Base URL for backend API. Can be overridden by environment variable VITE_API_URL.
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// When deployed on Hugging Face Spaces (or same-origin production), uses relative URL ("").
+// Defaults to http://localhost:8000 only when running in local development mode (e.g. Vite on port 5173 / 3000).
+const isLocalDev = typeof window !== "undefined" && (window.location.port === "5173" || window.location.port === "3000");
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? (isLocalDev ? "http://localhost:8000" : "");
 
 const api = axios.create({
   baseURL: API_BASE_URL,

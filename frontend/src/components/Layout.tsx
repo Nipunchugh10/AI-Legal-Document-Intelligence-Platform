@@ -72,6 +72,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith("/contracts/")) return "Contract Intelligence";
     if (path.startsWith("/security")) return "Security & 2FA";
     if (path.startsWith("/history")) return "Activity History";
+    if (path.startsWith("/conversations")) return "Q&A Conversations";
     return "Workspace";
   };
 
@@ -288,6 +289,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </svg>
             </div>
             <span className="nav-link-text">Activity History</span>
+          </NavLink>
+
+          <NavLink
+            to="/conversations"
+            className={({ isActive }) => `nav-link-item ${isActive ? "active" : ""}`}
+            title="Q&A Conversations"
+          >
+            <div className="nav-link-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <span className="nav-link-text">Q&A Conversations</span>
           </NavLink>
 
           <NavLink

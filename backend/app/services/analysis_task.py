@@ -17,6 +17,8 @@ from app.models.analysis import Analysis
 from app.agents.workflow import build_analysis_workflow
 from app.agents.base import ContractAnalysisState
 from app.services.pdf_extractor import extract_document_text
+from app.core.audit_events import AuditEventType
+from app.services.audit_logger import log_activity
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,20 @@ def run_analysis_workflow_task(contract_id: int, user_id: int) -> None:
         db.commit()
         logger.info("Background analysis workflow completed successfully for contract_id=%s", contract_id)
 
+        # Day 46: Audit Logging
+        log_activity(
+            db=db,
+            action=AuditEventType.ANALYSIS_COMPLETED.value,
+            user_id=user_id,
+            resource_id=contract_id,
+            status="SUCCESS",
+            metadata={
+                "filename": contract.filename,
+                "document_type": doc_type,
+                "risks_count": len(risks) if isinstance(risks, list) else 0,
+            },
+        )
+
     except Exception as exc:
         logger.exception("Unexpected exception in background analysis for contract_id=%s: %s", contract_id, exc)
         try:
@@ -158,6 +174,18 @@ def run_analysis_workflow_task(contract_id: int, user_id: int) -> None:
                 contract.status = "failed"
                 _save_analysis_record(db, contract_id, "error", {"error": str(exc)})
                 db.commit()
+                # Day 46: Audit Logging
+                log_activity(
+                    db=db,
+                    action=AuditEventType.ANALYSIS_FAILED.value,
+                    user_id=user_id,
+                    resource_id=contract_id,
+                    status="FAILURE",
+                    metadata={
+                        "filename": contract.filename if contract else "unknown",
+                        "error": str(exc),
+                    },
+                )
         except Exception as inner_exc:
             logger.error("Failed to persist failed status in db: %s", inner_exc)
     finally:

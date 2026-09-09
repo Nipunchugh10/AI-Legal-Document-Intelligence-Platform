@@ -117,12 +117,18 @@ class QARequest(BaseModel):
     """Payload for asking a question about a contract."""
 
     question: str = Field(..., description="The natural language question about the contract")
+    conversation_id: Optional[int] = Field(
+        None, description="Optional existing conversation thread ID to continue"
+    )
 
 
 class QAResponse(BaseModel):
     """Returned when a contract question is answered."""
 
     contract_id: int = Field(..., description="Database ID of the contract")
+    conversation_id: Optional[int] = Field(
+        None, description="Conversation thread ID this interaction belongs to"
+    )
     question: str = Field(..., description="The question that was asked")
     answer: str = Field(..., description="The generated answer, grounded in the contract")
     sources: list[QASourceItem] = Field(..., description="The list of cited sources from the contract")

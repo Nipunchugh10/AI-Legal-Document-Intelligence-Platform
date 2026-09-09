@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  # ---------------------------------------------------
+  # 1. PostgreSQL Relational Database Service
+  # ---------------------------------------------------
   postgres:
     image: postgres:15-alpine
     container_name: legal_ai_postgres
@@ -10,15 +13,21 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-legal_ai_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d legal_ai_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-legal_ai_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
+    networks:
+      - legal_ai_network
 
+  # ---------------------------------------------------
+  # 2. FastAPI Intelligence Backend Service
+  # ---------------------------------------------------
   backend:
     build:
       context: ./backend
@@ -26,40 +35,97 @@ services:
     container_name: legal_ai_backend
     restart: always
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-legal_ai_db}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - JWT_ALGORITHM=${JWT_ALGORITHM}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-      - SMS_API_KEY=${SMS_API_KEY}
-      - SMS_SENDER_ID=${SMS_SENDER_ID}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-40}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - SESSION_IDLE_TIMEOUT_MINUTES=${SESSION_IDLE_TIMEOUT_MINUTES:-40}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL}
-      - CHROMA_PERSIST_DIR=${CHROMA_PERSIST_DIR}
-      - APP_ENV=${APP_ENV}
-      - DEBUG=${DEBUG}
-      - BACKEND_PORT=${BACKEND_PORT}
-      - FRONTEND_URL=${FRONTEND_URL}
-      - UPLOAD_DIR=${UPLOAD_DIR}
-      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - CHROMA_PERSIST_DIR=/app/chroma_data
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
+      - BACKEND_PORT=8000
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - UPLOAD_DIR=/app/uploads
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-10}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT:-}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend/uploads:/app/uploads
+      - chroma_data:/app/chroma_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - legal_ai_network
 
+  # ---------------------------------------------------
+  # 3. React / Nginx Frontend Client Service
+  # ---------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    container_name: legal_ai_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - legal_ai_network
+
+  # ---------------------------------------------------
+  # 4. pgAdmin Database Management UI
+  # ---------------------------------------------------
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     container_name: legal_ai_pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
-      - "8080:80"
+      - "5050:80"
     depends_on:
       - postgres
+    networks:
+      - legal_ai_network
 
+# ---------------------------------------------------
+# Persistent Storage Volumes
+# ---------------------------------------------------
 volumes:
   postgres_data:
+    name: legal_ai_postgres_data
+  chroma_data:
+    name: legal_ai_chroma_data
+
+# ---------------------------------------------------
+# Dedicated Bridge Network
+# ---------------------------------------------------
+networks:
+  legal_ai_network:
+    name: legal_ai_network
+    driver: bridge

@@ -16,6 +16,8 @@ from app.agents.workflow import build_analysis_workflow
 from app.agents.base import ContractAnalysisState
 from app.services.pdf_extractor import extract_pdf_text
 from app.services.analysis_task import run_analysis_workflow_task
+from app.core.audit_events import AuditEventType
+from app.services.audit_logger import log_activity
 
 router = APIRouter()
 
@@ -101,6 +103,14 @@ async def run_full_analysis(
         contract.status = "processing"
         db.commit()
         background_tasks.add_task(run_analysis_workflow_task, contract_id, current_user.id)
+        log_activity(
+            db=db,
+            action=AuditEventType.ANALYSIS_QUEUED.value,
+            user_id=current_user.id,
+            resource_id=contract_id,
+            status="SUCCESS",
+            metadata={"filename": contract.filename},
+        )
         return AnalysisWorkflowResponse(
             contract_id=contract_id,
             status="processing",

@@ -50,7 +50,7 @@ class UserSession(Base):
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
-    user = relationship("User", backref="sessions")
+    user = relationship("User", back_populates="sessions")
 
     def __repr__(self) -> str:
         return f"<UserSession id={self.id} user_id={self.user_id} revoked={self.is_revoked}>"

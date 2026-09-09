@@ -30,6 +30,8 @@ from app.schemas.contract import (
     RiskAgentResponse,
     ComplianceAgentResponse,
 )
+from app.core.audit_events import AuditEventType
+from app.services.audit_logger import log_activity
 
 router = APIRouter()
 settings = get_settings()
@@ -109,6 +111,16 @@ async def upload_contract(
         db.add(db_contract)
         db.commit()
         db.refresh(db_contract)
+
+        # Day 46: Audit Logging
+        log_activity(
+            db=db,
+            action=AuditEventType.CONTRACT_UPLOADED.value,
+            user_id=current_user.id,
+            resource_id=db_contract.id,
+            status="SUCCESS",
+            metadata={"filename": original_filename, "size_bytes": len(content)},
+        )
     except Exception as e:
         # Clean up file on DB failure
         if dest_path.exists():
@@ -145,7 +157,7 @@ async def list_contracts(
 # ── GET /contracts/{contract_id} ─────────────────────────────────────────────
 
 @router.get(
-    "/{contract_id}",
+    "/{contract_id:int}",
     response_model=ContractResponse,
     summary="Get contract details",
     description="Retrieves the metadata of a specific contract by its ID. The contract must belong to the user.",
@@ -165,6 +177,14 @@ async def get_contract(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contract not found or not owned by user.",
         )
+    log_activity(
+        db=db,
+        action=AuditEventType.CONTRACT_VIEWED.value,
+        user_id=current_user.id,
+        resource_id=contract_id,
+        status="SUCCESS",
+        metadata={"filename": contract.filename},
+    )
     return contract
 
 
@@ -412,7 +432,7 @@ async def ingest_contract_endpoint(
 # ── DELETE /contracts/{contract_id} ─────────────────────────────────────────────
 
 @router.delete(
-    "/{contract_id}",
+    "/{contract_id:int}",
     status_code=status.HTTP_200_OK,
     summary="Delete a contract",
     description="Deletes a contract record from database, its associated analyses, its vector embeddings in ChromaDB, and the raw PDF file from local storage.",
@@ -458,11 +478,20 @@ async def delete_contract(
     except Exception as e:
         logger.warning(f"[-] Could not delete ChromaDB chunks for contract {contract_id}: {e}")
 
-    # 4. Delete contract from PostgreSQL (cascades to analyses)
+    # 4. Delete contract from PostgreSQL (cascades to analyses and conversations)
+    contract_filename = contract.filename
     try:
         db.delete(contract)
         db.commit()
         logger.info(f"[+] Deleted contract metadata from database for contract {contract_id}")
+        log_activity(
+            db=db,
+            action=AuditEventType.CONTRACT_DELETED.value,
+            user_id=current_user.id,
+            resource_id=contract_id,
+            status="SUCCESS",
+            metadata={"filename": contract_filename},
+        )
     except Exception as e:
         db.rollback()
         raise HTTPException(

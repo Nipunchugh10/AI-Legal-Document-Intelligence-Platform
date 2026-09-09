@@ -9,15 +9,17 @@ Day 38 — Contract Comparison Feature — Backend
 
 import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.audit_events import AuditEventType
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.contract import Contract
 from app.models.analysis import Analysis
 from app.models.user import User
 from app.schemas.comparison import ComparisonRequest, ComparisonResponse
+from app.services.audit_logger import log_activity
 from app.services.comparison_service import ComparisonService
 from app.services.pdf_extractor import extract_document_text
 
@@ -50,6 +52,7 @@ def _get_contract_text(contract: Contract) -> str:
 )
 async def compare_contracts(
     payload: ComparisonRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -111,6 +114,22 @@ async def compare_contracts(
             target_text=target_text,
             target_analysis=target_analysis_json,
         )
+
+        log_activity(
+            db=db,
+            action=AuditEventType.COMPARISON_RUN.value,
+            user_id=current_user.id,
+            resource_id=target_contract.id,
+            metadata={
+                "base_contract_id": base_contract.id,
+                "base_filename": base_contract.filename,
+                "target_contract_id": target_contract.id,
+                "target_filename": target_contract.filename,
+                "similarity_percentage": comparison_result.metrics.similarity_percentage,
+            },
+            request=request,
+        )
+
         return comparison_result
     except Exception as e:
         logger.error("Contract comparison execution failed: %s", e, exc_info=True)

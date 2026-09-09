@@ -40,6 +40,12 @@ from app.schemas.auth import (
     GoogleLoginRequest,
     UserSessionResponse,
 )
+from app.core.audit_events import AuditEventType
+from app.services.audit_logger import log_activity
+from app.core.config import get_settings
+from app.core.rate_limit import limiter
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -67,7 +73,9 @@ def mask_email(email: str) -> str:
         "the plaintext is never persisted. Returns the created user."
     ),
 )
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
 def register(
+    request: Request,
     body: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> UserResponse:
@@ -90,6 +98,17 @@ def register(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Day 46: Audit Logging
+    log_activity(
+        db=db,
+        action=AuditEventType.USER_REGISTERED.value,
+        user_id=user.id,
+        status="SUCCESS",
+        metadata={"email": user.email},
+        request=request,
+    )
+
     return user
 
 
@@ -104,9 +123,10 @@ def register(
         "and a secure database-backed refresh token. If Email 2FA is enabled, triggers OTP and returns a pending token."
     ),
 )
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
 def login(
-    body: LoginRequest,
     request: Request,
+    body: LoginRequest,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Authenticate a user, establish a session, and issue access & refresh tokens or trigger 2FA."""
@@ -116,6 +136,14 @@ def login(
 
     # Generic error message to prevent account enumeration
     if not user or not verify_password(body.password, user.hashed_password):
+        log_activity(
+            db=db,
+            action=AuditEventType.USER_LOGIN_FAILED.value,
+            user_id=user.id if user else None,
+            status="FAILURE",
+            metadata={"email": body.email, "reason": "Invalid credentials"},
+            request=request,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -123,6 +151,14 @@ def login(
         )
 
     if not user.is_active:
+        log_activity(
+            db=db,
+            action=AuditEventType.USER_LOGIN_FAILED.value,
+            user_id=user.id,
+            status="FAILURE",
+            metadata={"email": body.email, "reason": "Account is inactive"},
+            request=request,
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Account is inactive",
@@ -132,6 +168,16 @@ def login(
     if user.is_2fa_enabled:
         # Trigger OTP sending to registered email
         send_otp(db, user.email)
+
+        # Log OTP requested
+        log_activity(
+            db=db,
+            action=AuditEventType.TWO_FACTOR_OTP_REQUESTED.value,
+            user_id=user.id,
+            status="SUCCESS",
+            metadata={"email": user.email},
+            request=request,
+        )
 
         # Generate a short-lived pending 2FA token (expires in 5 minutes)
         pending_2fa_token = create_access_token(
@@ -156,6 +202,16 @@ def login(
         ip_address=ip_address,
     )
     access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
+
+    # Day 46: Audit Logging
+    log_activity(
+        db=db,
+        action=AuditEventType.USER_LOGIN.value,
+        user_id=user.id,
+        status="SUCCESS",
+        metadata={"email": user.email},
+        request=request,
+    )
 
     return TokenResponse(
         access_token=access_token,
@@ -236,6 +292,7 @@ def refresh(
 )
 def logout(
     body: RefreshRequest,
+    request: Request = None,
     db: Session = Depends(get_db),
 ):
     """Revoke the current session's refresh token."""
@@ -248,6 +305,13 @@ def logout(
     if session:
         session.is_revoked = True
         db.commit()
+        log_activity(
+            db=db,
+            action=AuditEventType.USER_LOGOUT.value,
+            user_id=session.user_id,
+            status="SUCCESS",
+            request=request,
+        )
 
     return {"status": "success", "message": "Successfully logged out"}
 
@@ -296,6 +360,14 @@ def confirm_2fa(
     current_user.is_2fa_enabled = True
     db.commit()
 
+    log_activity(
+        db=db,
+        action=AuditEventType.TWO_FACTOR_ENABLED.value,
+        user_id=current_user.id,
+        status="SUCCESS",
+        metadata={"email": current_user.email},
+    )
+
     return {
         "status": "success",
         "message": "Two-factor authentication (2FA) is now active on your account."
@@ -316,6 +388,14 @@ def disable_2fa(
     current_user.is_2fa_enabled = False
     db.commit()
 
+    log_activity(
+        db=db,
+        action=AuditEventType.TWO_FACTOR_DISABLED.value,
+        user_id=current_user.id,
+        status="SUCCESS",
+        metadata={"email": current_user.email},
+    )
+
     return {
         "status": "success",
         "message": "Two-factor authentication (2FA) has been disabled on your account."
@@ -330,11 +410,12 @@ def disable_2fa(
     summary="Verify 2FA OTP at login",
     description="Accepts a pending 2FA token and 6-digit OTP code. If valid, establishes session and returns access + refresh tokens.",
 )
+@limiter.limit(settings.RATE_LIMIT_2FA_VERIFY)
 def login_verify_2fa(
-    body: LoginVerify2FARequest,
     request: Request,
+    body: LoginVerify2FARequest,
     db: Session = Depends(get_db),
-) -> TokenResponse:
+):
     from app.core.security import decode_access_token
     from app.services.otp_service import verify_otp
 
@@ -382,6 +463,16 @@ def login_verify_2fa(
     )
     access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
 
+    # Day 46: Audit Logging
+    log_activity(
+        db=db,
+        action=AuditEventType.TWO_FACTOR_LOGIN_VERIFIED.value,
+        user_id=user.id,
+        status="SUCCESS",
+        metadata={"email": user.email},
+        request=request,
+    )
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -396,7 +487,9 @@ def login_verify_2fa(
     summary="Resend 2FA OTP at login",
     description="Resends the verification OTP code for a user in the pending 2FA state, with a 30-second cooldown.",
 )
+@limiter.limit(settings.RATE_LIMIT_2FA_RESEND)
 def resend_2fa_otp(
+    request: Request,
     body: Resend2FAOTPRequest,
     db: Session = Depends(get_db),
 ):

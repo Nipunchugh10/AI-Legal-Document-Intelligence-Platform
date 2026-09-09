@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
+import { fetchConversations, type ConversationItem } from "../services/historyService";
 import "./ContractDetailPage.css";
 
 interface ContractInfo {
@@ -80,6 +81,7 @@ export const ContractDetailPage: React.FC = () => {
   const [expandedClauses, setExpandedClauses] = useState<Record<string, boolean>>({});
   const [selectedRedlineTier, setSelectedRedlineTier] = useState<Record<number, "balanced" | "protective" | "aggressive">>({});
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
 
   const fetchWorkspaceData = async () => {
     if (!id) return;
@@ -108,6 +110,14 @@ export const ContractDetailPage: React.FC = () => {
         }
       } catch {
         setAnalysisData(null);
+      }
+
+      // 3. Fetch past Q&A discussion threads for quick resume
+      try {
+        const convoList = await fetchConversations({ contract_id: Number(id) });
+        setConversations(convoList);
+      } catch {
+        // Non-critical, ignore
       }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || "Failed to load contract intelligence workspace.");
@@ -462,6 +472,20 @@ ${(analysisData.compliance_issues || [])
             </>
           )}
 
+          {conversations.length > 0 && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate(`/contracts/${contract.id}/ask?conversation_id=${conversations[0].id}`)}
+              title={`Resume recent discussion: "${conversations[0].title || "Untitled"}" (${conversations[0].message_count} msgs)`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              <span>Resume Q&A ({conversations.length})</span>
+            </button>
+          )}
+
           <button
             className="btn btn-secondary btn-sm"
             onClick={() => navigate(`/contracts/${contract.id}/ask`)}
@@ -470,7 +494,7 @@ ${(analysisData.compliance_issues || [])
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <span>Ask Grounded Q&A</span>
+            <span>{conversations.length > 0 ? "New Q&A" : "Ask Grounded Q&A"}</span>
           </button>
 
           <button

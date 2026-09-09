@@ -39,3 +39,22 @@ async def get_ai_usage_telemetry(
     """
     logger.info("Admin AI usage telemetry requested by user_id=%s", current_user.id)
     return ai_usage_monitor.get_usage_metrics()
+
+
+@router.get(
+    "/db-health",
+    status_code=status.HTTP_200_OK,
+    summary="Get Cloud Database Connectivity and Schema Diagnostics",
+    description="Returns live database connection latency, version, SSL status, and table health.",
+)
+async def get_db_health(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns live cloud database diagnostic health check.
+    Protected endpoint accessible by authenticated users/administrators.
+    """
+    from app.core.database import check_database_connection
+    logger.info("Admin DB health check requested by user_id=%s", current_user.id)
+    return check_database_connection()
+

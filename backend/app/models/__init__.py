@@ -19,6 +19,7 @@ from app.models.analysis import Analysis
 from app.models.audit_log import AuditLog
 from app.models.user_session import UserSession
 from app.models.email_otp import EmailOTPVerification
+from app.models.conversation import Conversation, ConversationMessage
 
 __all__ = [
     "User",
@@ -27,4 +28,6 @@ __all__ = [
     "AuditLog",
     "UserSession",
     "EmailOTPVerification",
+    "Conversation",
+    "ConversationMessage",
 ]

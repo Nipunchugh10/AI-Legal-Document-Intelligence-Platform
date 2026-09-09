@@ -17,6 +17,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.core.config import get_settings
+from slowapi.errors import RateLimitExceeded
+from app.core.rate_limit import limiter, custom_rate_limit_exceeded_handler
 from app.api import auth as auth_router
 from app.api import contracts as contracts_router
 from app.api import qa as qa_router
@@ -24,10 +26,15 @@ from app.api import analysis as analysis_router
 from app.api import comparison as comparison_router
 from app.api import search as search_router
 from app.api import admin as admin_router
+from app.api import history as history_router
+from app.api import account as account_router
 
 # Setup logger for main module
-logger = logging.getLogger(__name__)
+from app.core.config import get_settings, configure_logging
+
 settings = get_settings()
+configure_logging(settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------
@@ -36,11 +43,12 @@ settings = get_settings()
 import asyncio
 
 async def session_cleanup_loop():
-    """Background loop to run session cleanup task daily."""
+    """Background loop to run session and data retention cleanup tasks daily."""
     from app.core.database import SessionLocal
     from app.services.session_cleanup import clean_expired_sessions
+    from app.services.account_service import apply_retention_cleanup
 
-    print("[*] Starting background session cleanup loop...")
+    print("[*] Starting background session & retention cleanup loop...")
     while True:
         try:
             db = SessionLocal()
@@ -48,10 +56,14 @@ async def session_cleanup_loop():
                 count = clean_expired_sessions(db)
                 if count > 0:
                     print(f"[+] Session Cleanup: Revoked {count} expired/idle sessions.")
+
+                purged = apply_retention_cleanup(db)
+                if purged > 0:
+                    print(f"[+] Retention Policy: Purged {purged} expired activity log records.")
             finally:
                 db.close()
         except Exception as e:
-            print(f"[-] Session Cleanup error: {e}")
+            print(f"[-] Maintenance Cleanup error: {e}")
 
         # Run every 24 hours (86400 seconds)
         await asyncio.sleep(86400)
@@ -62,9 +74,11 @@ async def lifespan(app: FastAPI):
     """Runs on application startup and shutdown."""
     print("=" * 60)
     print(" AI Legal Document Intelligence Platform")
-    print(f" Environment : {settings.APP_ENV}")
-    print(f" Debug       : {settings.DEBUG}")
-    print(f" Started at  : {datetime.now(timezone.utc).isoformat()}")
+    print(f" Environment   : {settings.APP_ENV}")
+    print(f" Debug         : {settings.DEBUG}")
+    print(f" Log Level     : {settings.LOG_LEVEL}")
+    print(f" Security Hdr  : {settings.STRICT_SECURITY_HEADERS}")
+    print(f" Started at    : {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
 
     # Start the session cleanup task in the background
@@ -91,16 +105,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Attach rate limiter to app state and register 429 handler (Day 54)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
+
 
 # ------------------------------------------------------------------
-# CORS Middleware
+# CORS Middleware — Day 50 Dynamic Origins
 # ------------------------------------------------------------------
+cors_origins = list(settings.CORS_ORIGINS) if isinstance(settings.CORS_ORIGINS, list) else [settings.FRONTEND_URL]
+if settings.FRONTEND_URL and settings.FRONTEND_URL not in cors_origins:
+    cors_origins.append(settings.FRONTEND_URL)
+if "http://localhost:3000" not in cors_origins:
+    cors_origins.append("http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.FRONTEND_URL,  # React dev server
-        "http://localhost:3000",  # Fallback
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -125,6 +146,90 @@ async def add_process_time_header(request: Request, call_next):
 
 
 # ------------------------------------------------------------------
+# Enterprise Security Headers Middleware — Day 50
+# ------------------------------------------------------------------
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Injects strict security headers when enabled, in staging/production, or in Hugging Face Spaces."""
+    response = await call_next(request)
+    import os
+    is_hf_space = bool(
+        os.getenv("SPACE_ID")
+        or os.getenv("HUGGINGFACE_SPACE")
+        or settings.ALLOW_HF_IFRAME
+    )
+    should_apply_security_headers = (
+        settings.STRICT_SECURITY_HEADERS
+        or settings.APP_ENV in {"production", "staging"}
+        or is_hf_space
+    )
+    if should_apply_security_headers:
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        if is_hf_space:
+            response.headers["Content-Security-Policy"] = (
+                "frame-ancestors 'self' https://huggingface.co https://*.huggingface.co;"
+            )
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
+
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.url.scheme == "https" or settings.APP_ENV == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+# ------------------------------------------------------------------
+# Frontend Static Discovery & Unified SPA Navigation Middleware — Day 53
+# ------------------------------------------------------------------
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, RedirectResponse
+
+FRONTEND_DIST_CANDIDATES = [
+    Path(__file__).resolve().parents[2] / "frontend" / "dist",
+    Path("/app/frontend/dist"),
+    Path("/app/dist"),
+]
+
+frontend_dist = next(
+    (p for p in FRONTEND_DIST_CANDIDATES if p.exists() and (p / "index.html").exists()),
+    None,
+)
+
+if frontend_dist:
+    logger.info("Serving frontend static assets from %s", frontend_dist)
+
+
+@app.middleware("http")
+async def spa_navigation_middleware(request: Request, call_next):
+    """
+    Unified Runtime SPA Middleware — Day 53:
+    In unified containers (Hugging Face Spaces), the React SPA and FastAPI backend
+    share the same origin and port (7860).
+    When a browser navigates to any URL (e.g. /dashboard, /history, /contracts/upload),
+    it sends a GET request with 'Accept: text/html...'.
+    If the path is not a documentation endpoint (/docs, /redoc, /openapi.json),
+    not a system endpoint (/health, /health/db), and not a static asset,
+    serve index.html so React Router performs client-side rendering.
+    """
+    if request.method == "GET" and frontend_dist:
+        accept = request.headers.get("accept", "").lower()
+        path = request.url.path
+        if "text/html" in accept:
+            # Exclude docs, health, static assets, gradio, and test endpoints
+            if not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/assets", "/gradio", "/test-")):
+                file_candidate = frontend_dist / path.lstrip("/")
+                if not (path != "/" and file_candidate.is_file()):
+                    return FileResponse(frontend_dist / "index.html")
+    return await call_next(request)
+
+
+
+
+# ------------------------------------------------------------------
 # Global Exception Handler — Day 29
 # ------------------------------------------------------------------
 @app.exception_handler(Exception)
@@ -134,6 +239,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     and returns a standard internal server error response.
     Passes standard FastAPI HTTPExceptions and ValidationErrors through.
     """
+    if isinstance(exc, RateLimitExceeded):
+        return custom_rate_limit_exceeded_handler(request, exc)
+
     if isinstance(exc, HTTPException):
         return JSONResponse(
             status_code=exc.status_code,
@@ -163,6 +271,8 @@ app.include_router(contracts_router.router, prefix="/contracts", tags=["Contract
 app.include_router(qa_router.router, prefix="/contracts", tags=["Q&A"])
 app.include_router(analysis_router.router, prefix="/contracts", tags=["Orchestration"])
 app.include_router(admin_router.router, prefix="/admin", tags=["Admin & Telemetry"])
+app.include_router(history_router.router, tags=["History & Conversations"])
+app.include_router(account_router.router, tags=["Account & Privacy"])
 
 
 # ------------------------------------------------------------------
@@ -184,6 +294,24 @@ async def health_check():
         "environment": settings.APP_ENV,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get(
+    "/health/db",
+    tags=["System"],
+    summary="Database Health Check",
+    description="Probes database connectivity and returns latency, version, SSL, and schema health.",
+)
+async def db_health_check():
+    """
+    Active database diagnostic probe.
+    Returns 200 OK when connected and core schema is healthy; 503 Service Unavailable otherwise.
+    """
+    from app.core.database import check_database_connection
+    diag = check_database_connection()
+    status_code = 200 if diag["status"] == "connected" and diag.get("core_tables_healthy") else 503
+    return JSONResponse(status_code=status_code, content=diag)
+
 
 
 # ------------------------------------------------------------------
@@ -218,10 +346,41 @@ async def test_llm(prompt: str = "Say 'Hello from Gemini'"):
 
 
 # ------------------------------------------------------------------
-# Root Redirect (convenience)
+# Static Frontend Files Mounting & Catch-All Fallback
 # ------------------------------------------------------------------
-@app.get("/", include_in_schema=False)
-async def root():
-    """Redirects root to the interactive API docs."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
+if frontend_dist:
+    if (frontend_dist / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str, request: Request):
+        # 1. Allow documentation, OpenAPI schema, and Gradio routes
+        if full_path in {"docs", "redoc", "openapi.json", "gradio"} or full_path.startswith(("docs/", "redoc/", "gradio/")):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        # 2. Check if path matches a physical static asset (e.g. favicon.ico, logo.svg)
+        if full_path:
+            file_path = frontend_dist / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+
+        accept = request.headers.get("accept", "").lower()
+
+        # 3. If request explicitly accepts text/html, serve the SPA HTML entrypoint
+        if "text/html" in accept or accept == "":
+            return FileResponse(frontend_dist / "index.html")
+
+        # 4. If request explicitly asks for JSON or starts with known API prefixes, return 404
+        api_prefixes = (
+            "auth", "contracts", "admin", "history", "account", "health", "api",
+        )
+        if "application/json" in accept or full_path.startswith(api_prefixes):
+            raise HTTPException(status_code=404, detail="Endpoint not found")
+
+        # 5. Default fallback to SPA index.html
+        return FileResponse(frontend_dist / "index.html")
+else:
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Redirects root to the interactive API docs when frontend dist is not mounted."""
+        return RedirectResponse(url="/docs")

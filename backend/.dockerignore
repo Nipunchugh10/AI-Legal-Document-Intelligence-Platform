@@ -1,0 +1,14 @@
+venv/
+venv_linux/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+uploads/*
+!uploads/.gitkeep
+chroma_data/*
+!chroma_data/.gitkeep

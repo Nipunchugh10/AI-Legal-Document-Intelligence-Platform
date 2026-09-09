@@ -673,3 +673,81 @@
   color: var(--color-text-muted);
   padding: 0 4px;
 }
+
+/* ==========================================================================
+   Conversation Thread Switcher & Thread History Controls
+   ========================================================================== */
+.qa-thread-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thread-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 2px 10px;
+  height: 32px;
+  transition: border-color var(--transition-fast);
+}
+
+.thread-select-wrapper:focus-within {
+  border-color: var(--color-primary);
+}
+
+.thread-select-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.thread-select {
+  background: transparent;
+  border: none;
+  color: var(--color-text-main);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  max-width: 250px;
+  text-overflow: ellipsis;
+}
+
+.thread-select option {
+  background: var(--color-surface-elevated, #1a1f2c);
+  color: var(--color-text-main, #f1f5f9);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.btn-ghost:hover {
+  background: var(--color-surface-elevated);
+  color: var(--color-primary);
+  border-color: var(--color-border);
+}
+
+.thread-loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}

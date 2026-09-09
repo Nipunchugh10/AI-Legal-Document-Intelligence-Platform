@@ -52,30 +52,42 @@ To protect accounts on shared or unattended devices, the platform implements two
   * *Frontend*: A client-side hook monitors mouse/keyboard interactions. A warning modal is shown at 38 minutes. If no action is taken by 40 minutes, local storage is cleared and the user is redirected to `/login`.
 * **Absolute Session Limit (7 days)**: Regardless of user activity, all sessions expire exactly 7 days after initial creation (`expires_at`), requiring a fresh password login.
 
-### 4. Phone-Based Two-Factor Authentication (2FA)
-A second verification layer is implemented for Indian mobile numbers (`+91` prefix):
-* Uses MSG91 (DLT compliance registered) or Twilio Verify for reliable Indian carrier delivery routes.
-* Verifies phone numbers on registration/login using a 6-digit OTP code hashed at rest.
-* Limits verification attempts (max 5) and enforces cooldowns (30s) to prevent spam.
+### 4. Email-Based Two-Factor Authentication (2FA) (Phase 2A)
+A second verification layer delivers cryptographic one-time passwords directly to registered user email addresses:
+* Generates 6-digit cryptographically secure OTP tokens hashed with SHA-256 at rest in `email_otp_verifications`.
+* Enforces strict 5-minute expiry limits, 5-attempt brute-force lockouts, and 30-second cooldown throttles on resend requests.
+* Issues short-lived pending JWT verification tokens during the login handshake, blocking unverified access to core routes until 2FA completes.
 
 ---
 
-## 📊 Database Schema (Day 3 & Day 5 Base)
+## 📊 Database Schema (Day 3, Day 5, & Day 45 Enterprise Architecture)
 
 ```mermaid
 erDiagram
     users ||--o{ contracts : uploads
     users ||--o{ user_sessions : establishes
     users ||--o{ audit_logs : triggers
+    users ||--o{ conversations : initiates
     contracts ||--o{ analyses : generates
     contracts ||--o{ contract_embeddings : chunks
+    contracts ||--o{ conversations : scopes
+    conversations ||--o{ conversation_messages : contains
 ```
 
 ### Core Tables
-1. **`users`**: Core user accounts.
+1. **`users`**: Core user accounts with 2FA flags, password hashes, and active states.
 2. **`contracts`**: Metadata for uploaded PDF contracts (paths, processing status, and ownership).
-3. **`analyses`**: Structured JSON/JSONB results containing classified clauses, flagged compliance issues, and risk profiles.
-4. **`audit_logs`**: Append-only log tracking all security events and operations (login, registration, upload, analysis).
+3. **`analyses`**: Structured JSON/JSONB results containing classified clauses, flagged compliance issues, and 3-tier risk profiles.
+4. **`audit_logs`**: Append-only security and operational audit trail tracking events (`action`), execution status (`status`), network context (`ip_address`, `user_agent`), and metadata (`metadata_json`). Foreign key uses `ON DELETE SET NULL` to preserve immutable compliance records if a user account is deleted.
+5. **`conversations`**: Stateful legal dialogue threads tied to a user and contract, maintaining editable titles and chronological sorting (`last_message_at`). Foreign key uses `ON DELETE CASCADE`.
+6. **`conversation_messages`**: Dialogue turns with role (`user`/`assistant`), full response text, and structured citation coordinates (`cited_clause_refs` in JSONB) linking legal claims directly to verbatim contract chunks. Foreign key uses `ON DELETE CASCADE`.
+7. **`user_sessions`**: Active user sessions for idle timeout enforcement and token revocation.
+8. **`email_otp_verifications`**: Ephemeral SHA-256 hashed 2FA verification codes with attempt counts and expiration timestamps.
+
+### Architectural Boundary: Audit Trail vs. Conversation History
+A critical design requirement is the deliberate segregation between two types of historical records:
+* **Compliance Audit Trail (`audit_logs`)**: An immutable, append-only security log for forensic tracking and audit compliance. Rows are never edited or removed during ordinary operations. Foreign key to `users` is `ON DELETE SET NULL`, ensuring the audit trail remains intact if an account is closed.
+* **Interactive Dialogue State (`conversations` & `conversation_messages`)**: Dynamic, user-facing, and editable structured data. Users can browse past threads, resume discussions, rename titles, and delete conversations. When a contract or user is deleted, associated conversation threads are cascade-deleted (`ON DELETE CASCADE`) to respect user privacy and data retention policies.
 
 ---
 

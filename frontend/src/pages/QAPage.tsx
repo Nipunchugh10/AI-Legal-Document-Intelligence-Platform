@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import api from "../services/api";
+import {
+  fetchConversationDetail,
+  fetchConversations,
+  type ConversationItem,
+} from "../services/historyService";
 import "./QAPage.css";
 
 interface QASource {
@@ -12,8 +17,8 @@ interface QASource {
 }
 
 interface ChatMessage {
-  id: string;
-  sender: "user" | "assistant";
+  id: string | number;
+  sender: "user" | "assistant" | "system";
   text: string;
   sources?: QASource[];
   timestamp: string;
@@ -31,6 +36,14 @@ interface ContractInfo {
 export const QAPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialConversationId = searchParams.get("conversation_id");
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(
+    initialConversationId ? Number(initialConversationId) : null
+  );
+  const [contractConversations, setContractConversations] = useState<ConversationItem[]>([]);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
 
   const [contract, setContract] = useState<ContractInfo | null>(null);
   const [contractText, setContractText] = useState<string>("");
@@ -83,6 +96,88 @@ export const QAPage: React.FC = () => {
     loadData();
   }, [id]);
 
+  // Load list of past conversation threads for this contract
+  const loadContractConversations = useCallback(async () => {
+    if (!id) return;
+    try {
+      const convos = await fetchConversations({ contract_id: Number(id) });
+      setContractConversations(convos);
+    } catch (err) {
+      console.error("Failed to load conversation history for contract", err);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadContractConversations();
+  }, [loadContractConversations]);
+
+  // Sync activeConversationId whenever URL searchParams change
+  useEffect(() => {
+    const urlConvoId = searchParams.get("conversation_id");
+    const parsedId = urlConvoId ? Number(urlConvoId) : null;
+    if (parsedId !== activeConversationId) {
+      setActiveConversationId(parsedId);
+    }
+  }, [searchParams]);
+
+  // Load conversation messages and citations when activeConversationId is selected
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    let isMounted = true;
+    setIsLoadingThread(true);
+
+    fetchConversationDetail(activeConversationId)
+      .then((detail) => {
+        if (!isMounted) return;
+        const mapped: ChatMessage[] = detail.messages.map((m) => ({
+          id: m.id,
+          sender: m.role,
+          text: m.content,
+          sources: m.cited_clause_refs || [],
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        }));
+        setMessages(mapped);
+
+        // Auto-select first citation from latest assistant message that contains citations
+        const lastAiMsg = [...detail.messages]
+          .reverse()
+          .find((m) => m.role === "assistant" && m.cited_clause_refs && m.cited_clause_refs.length > 0);
+        if (lastAiMsg?.cited_clause_refs && lastAiMsg.cited_clause_refs.length > 0) {
+          setSelectedCitation(lastAiMsg.cited_clause_refs[0]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load conversation thread detail:", err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingThread(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeConversationId]);
+
+  const handleStartNewConversation = () => {
+    setActiveConversationId(null);
+    setSearchParams({}, { replace: true });
+    setMessages([]);
+    setSelectedCitation(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const handleSelectConversation = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === "new") {
+      handleStartNewConversation();
+    } else {
+      const parsedId = Number(val);
+      setActiveConversationId(parsedId);
+      setSearchParams({ conversation_id: String(parsedId) });
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -112,8 +207,10 @@ export const QAPage: React.FC = () => {
         question: string;
         answer: string;
         sources: QASource[];
+        conversation_id?: number;
       }>(`/contracts/${id}/ask`, {
         question: textToSend,
+        conversation_id: activeConversationId || undefined,
       });
 
       const aiMsg: ChatMessage = {
@@ -125,6 +222,13 @@ export const QAPage: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+
+      // If a new conversation was initiated or updated, update active thread and query params
+      if (response.data.conversation_id && response.data.conversation_id !== activeConversationId) {
+        setActiveConversationId(response.data.conversation_id);
+        setSearchParams({ conversation_id: String(response.data.conversation_id) }, { replace: true });
+        loadContractConversations();
+      }
 
       // If the response contains sources, auto-select the first citation for inspection
       if (response.data.sources && response.data.sources.length > 0) {
@@ -154,9 +258,8 @@ export const QAPage: React.FC = () => {
 
   const handleClearChat = () => {
     if (messages.length === 0) return;
-    if (window.confirm("Are you sure you want to clear the conversation history?")) {
-      setMessages([]);
-      setSelectedCitation(null);
+    if (window.confirm("Start a new conversation thread? Your existing discussion remains saved in Q&A History.")) {
+      handleStartNewConversation();
     }
   };
 
@@ -255,6 +358,46 @@ ${messages
         </nav>
 
         <div className="qa-header-actions">
+          {/* Conversation Thread Selector & Controls */}
+          <div className="qa-thread-selector-container">
+            <div className="thread-select-wrapper" title="Switch or resume past conversation threads">
+              <span className="thread-select-icon">💬</span>
+              <select
+                className="thread-select"
+                value={activeConversationId || "new"}
+                onChange={handleSelectConversation}
+                aria-label="Select discussion thread"
+              >
+                <option value="new">+ Start New Thread</option>
+                {contractConversations.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title || "Untitled Thread"} ({c.message_count} msgs)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {activeConversationId && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleStartNewConversation}
+                title="Start a new blank discussion"
+              >
+                + New Thread
+              </button>
+            )}
+
+            {contractConversations.length > 0 && (
+              <Link
+                to={`/conversations?contract_id=${contract.id}`}
+                className="btn-ghost"
+                title="Browse all saved threads for this document"
+              >
+                <span>All Threads ({contractConversations.length})</span>
+              </Link>
+            )}
+          </div>
+
           {messages.length > 0 && (
             <>
               <button
@@ -273,13 +416,13 @@ ${messages
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={handleClearChat}
-                title="Clear all messages in thread"
+                title="Clear current thread view or start new"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                <span>Clear Chat</span>
+                <span>Reset View</span>
               </button>
             </>
           )}
@@ -401,7 +544,12 @@ ${messages
         <div className="qa-right-panel">
           {/* Chat Messages Feed */}
           <div className="chat-messages-feed">
-            {messages.length === 0 ? (
+            {isLoadingThread ? (
+              <div className="thread-loading-overlay">
+                <div className="spinner" style={{ width: "28px", height: "28px", borderWidth: "3px" }} />
+                <span>Loading conversation thread & citations...</span>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="chat-empty-hero">
                 <div className="hero-avatar-circle">
                   <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

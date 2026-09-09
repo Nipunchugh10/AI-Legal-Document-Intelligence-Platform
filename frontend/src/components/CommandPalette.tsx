@@ -111,6 +111,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         },
       },
       {
+        id: "nav-conversations",
+        title: "Q&A Conversations",
+        category: "Navigation",
+        icon: "💬",
+        subtext: "Explore and resume past grounded contract discussions",
+        onSelect: () => {
+          navigate("/conversations");
+          onClose();
+        },
+      },
+      {
         id: "nav-security",
         title: "Security & 2FA Settings",
         category: "Navigation",

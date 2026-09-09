@@ -35,9 +35,12 @@ class Contract(Base):
     )
 
     # Relationships (back-populated when queried)
-    user = relationship("User", backref="contracts")
+    user = relationship("User", back_populates="contracts")
     analyses = relationship(
         "Analysis", back_populates="contract", cascade="all, delete-orphan"
+    )
+    conversations = relationship(
+        "Conversation", back_populates="contract", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

@@ -17,6 +17,11 @@ def trigger_unhandled_error():
 def trigger_http_error():
     raise HTTPException(status_code=403, detail="Simulated Forbidden Error")
 
+# Ensure dynamically registered test routes take precedence over catch-all SPA handler
+app.router.routes.insert(0, app.router.routes.pop())
+app.router.routes.insert(0, app.router.routes.pop())
+
+
 def test_global_exception_handler(caplog):
     """
     Verifies that unhandled exceptions are caught by the global exception handler,
@@ -25,13 +30,15 @@ def test_global_exception_handler(caplog):
     """
     # 1. Unhandled exception
     with caplog.at_level(logging.ERROR):
-        response = client.get("/test-error")
+        response = client.get("/test-error", headers={"Accept": "application/json"})
         assert response.status_code == 500
         assert response.json() == {"error": "Internal server error"}
-        assert any("Unhandled error: Simulated unexpected database connection failure" in record.message for record in caplog.records)
+        assert "Unhandled error: Simulated unexpected database connection failure" in caplog.text or any(
+            "Unhandled error: Simulated unexpected database connection failure" in r.getMessage() for r in caplog.records
+        )
 
     # 2. Handled HTTPException
-    response = client.get("/test-http-error")
+    response = client.get("/test-http-error", headers={"Accept": "application/json"})
     assert response.status_code == 403
     assert response.json() == {"detail": "Simulated Forbidden Error"}
 
@@ -50,9 +57,13 @@ def test_llm_gemini_success(mock_gemini_cascade, caplog):
         assert response == "Gemini response text"
         
         # Verify start logs
-        assert any("Starting LLM request for contract_id=999" in record.message for record in caplog.records)
+        assert "Starting LLM request for contract_id=999" in caplog.text or any(
+            "Starting LLM request for contract_id=999" in r.getMessage() for r in caplog.records
+        )
         # Verify success logs specifying provider=Gemini and contract_id=999
-        assert any("LLM call served by provider=Gemini for contract_id=999" in record.message for record in caplog.records)
+        assert "LLM call served by provider=Gemini for contract_id=999" in caplog.text or any(
+            "LLM call served by provider=Gemini for contract_id=999" in r.getMessage() for r in caplog.records
+        )
 
 
 @patch("app.services.llm_provider._generate_with_model_cascade")
@@ -69,4 +80,6 @@ def test_llm_gemini_failure(mock_gemini_cascade, caplog):
     assert "Simulated API failure" in str(exc_info.value)
     
     with caplog.at_level(logging.ERROR):
-        assert any("All Gemini LLM models failed for contract_id=999: Simulated API failure" in record.message for record in caplog.records)
+        assert "All Gemini LLM models failed for contract_id=999: Simulated API failure" in caplog.text or any(
+            "All Gemini LLM models failed for contract_id=999: Simulated API failure" in r.getMessage() for r in caplog.records
+        )

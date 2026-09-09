@@ -1,0 +1,53 @@
+# ==============================================
+# AI Legal Document Intelligence Platform
+# Hugging Face Spaces (Gradio SDK) Root Dependencies
+# ==============================================
+
+# --- Web Framework & Gradio ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.6
+gradio>=6.0.0
+
+# --- Database & Migrations ---
+sqlalchemy>=2.0.35
+alembic>=1.13.2
+psycopg2-binary>=2.9.9
+
+# --- Data Validation & Configuration ---
+pydantic>=2.9.2
+pydantic-settings>=2.5.2
+python-dotenv>=1.0.1
+
+# --- Security, Authentication & Rate Limiting ---
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0
+email-validator>=2.2.0
+slowapi>=0.1.9
+
+# --- File Uploads & Forms ---
+python-multipart>=0.0.12
+
+# --- Google Gemini AI / LLM & Auth ---
+google-generativeai>=0.8.0
+google-auth>=2.35.0
+
+# --- Document & Image Processing ---
+pymupdf>=1.24.10
+pdfplumber>=0.11.4
+Pillow>=10.0.0
+python-docx>=1.1.0
+
+# --- Text Chunking & Vector Search ---
+langchain-text-splitters>=0.2.0
+tiktoken>=0.7.0
+chromadb>=0.5.0
+
+# --- LangGraph & Multi-Agent Pipeline ---
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+tenacity>=8.2.0
+
+# --- Testing ---
+pytest>=8.0.0

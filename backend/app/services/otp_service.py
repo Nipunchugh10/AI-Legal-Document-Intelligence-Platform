@@ -16,11 +16,50 @@ from app.core.config import get_settings
 from app.core.security import hash_token
 from app.models.email_otp import EmailOTPVerification
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 OTP_EXPIRY_MINUTES = 5
 MAX_OTP_ATTEMPTS = 5
+
+
+def send_smtp_email(to_email: str, subject: str, body: str) -> bool:
+    """
+    Sends an email via standard SMTP if host and credentials are configured.
+    Returns True if sent successfully, False otherwise.
+    """
+    active_settings = get_settings()
+    if not active_settings.SMTP_HOST or not active_settings.SMTP_USERNAME:
+        return False
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = active_settings.SMTP_FROM_EMAIL
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        if active_settings.SMTP_USE_SSL:
+            server = smtplib.SMTP_SSL(active_settings.SMTP_HOST, active_settings.SMTP_PORT, timeout=10)
+        else:
+            server = smtplib.SMTP(active_settings.SMTP_HOST, active_settings.SMTP_PORT, timeout=10)
+            if active_settings.SMTP_USE_TLS:
+                server.starttls()
+
+        if active_settings.SMTP_USERNAME and active_settings.SMTP_PASSWORD:
+            server.login(active_settings.SMTP_USERNAME, active_settings.SMTP_PASSWORD)
+
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"Successfully dispatched SMTP email to {to_email}")
+        return True
+    except Exception as e:
+        logger.warning(f"SMTP dispatch to {to_email} failed: {e}. Falling back to mock logger.")
+        return False
 
 
 def generate_otp() -> str:
@@ -32,8 +71,9 @@ def send_otp(db: Session, email: str) -> None:
     """
     Generates a 6-digit OTP, hashes it,
     saves it to the database (or updates if an existing pending OTP exists),
-    and sends the Email. If SMTP credentials are not configured, prints to console (mock).
+    and sends the Email via SMTP if configured, or prints to console mock.
     """
+    active_settings = get_settings()
     normalized_email = email.strip().lower()
     code = generate_otp()
     hashed = hash_token(code)
@@ -65,12 +105,20 @@ def send_otp(db: Session, email: str) -> None:
     db.commit()
     db.refresh(otp_entry)
 
-    # Deliver the email (or fall back to console logging in development)
-    if settings.APP_ENV == "development":
+    # Attempt SMTP dispatch if configured
+    subject = "Your LegalIntel 2FA Verification Code"
+    body = (
+        f"Your LegalIntel verification code is: {code}\n\n"
+        f"This code will expire in {OTP_EXPIRY_MINUTES} minutes.\n"
+        "If you did not request this verification code, please ignore this email or review your account security."
+    )
+
+    sent = send_smtp_email(normalized_email, subject, body)
+    if not sent:
+        # Fallback to console delivery for local development and test environments
         print(f"[EMAIL MOCK] SENT OTP TO {normalized_email}: {code} (Expires in {OTP_EXPIRY_MINUTES} minutes)")
-    else:
-        # TODO: Replace with actual SMTP delivery (smtplib + email.mime)
-        logger.info(f"OTP dispatched to {normalized_email}")
+        logger.info(f"OTP dispatched (console mock) to {normalized_email}")
+
 
 
 def verify_otp(db: Session, email: str, submitted_code: str) -> bool:

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "tsc -b",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -28,7 +28,7 @@
     "vite": "^6.4.3"
   },
   "optionalDependencies": {
-    "@oxlint/binding-linux-x64-gnu": "^1.71.0",
+    "@oxlint/binding-linux-x64-gnu": "^1.82.0",
     "@rolldown/binding-linux-x64-gnu": "^1.1.3"
   }
 }

@@ -11,6 +11,7 @@ import { ComparisonPage } from "./pages/ComparisonPage";
 import { SearchPage } from "./pages/SearchPage";
 import { Security } from "./pages/Security";
 import { HistoryPage } from "./pages/HistoryPage";
+import { ConversationsPage } from "./pages/ConversationsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/useAuthStore";
 import "./App.css";
@@ -50,6 +51,7 @@ export const App: React.FC = () => {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/security" element={<Security />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/conversations" element={<ConversationsPage />} />
           </Route>
 
           {/* Fallback Catch-All Route */}

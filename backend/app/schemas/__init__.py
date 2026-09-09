@@ -16,6 +16,27 @@ from app.schemas.search import (
     ContractSearchResult,
     SemanticSearchResponse,
 )
+from app.schemas.conversation import (
+    ConversationMessageCreate,
+    ConversationMessageResponse,
+    ConversationCreate,
+    ConversationUpdate,
+    ConversationResponse,
+    ConversationDetailResponse,
+)
+from app.schemas.audit_log import (
+    AuditLogCreate,
+    AuditLogResponse,
+    AuditLogFilterParams,
+    AuditLogFeedResponse,
+)
+from app.schemas.account import (
+    RetentionPolicyResponse,
+    RetentionPolicyUpdate,
+    AccountDeleteOTPResponse,
+    AccountDeleteRequest,
+    AccountDeleteResponse,
+)
 
 __all__ = [
     "RegisterRequest",
@@ -26,4 +47,19 @@ __all__ = [
     "SearchChunkResult",
     "ContractSearchResult",
     "SemanticSearchResponse",
+    "ConversationMessageCreate",
+    "ConversationMessageResponse",
+    "ConversationCreate",
+    "ConversationUpdate",
+    "ConversationResponse",
+    "ConversationDetailResponse",
+    "AuditLogCreate",
+    "AuditLogResponse",
+    "AuditLogFilterParams",
+    "AuditLogFeedResponse",
+    "RetentionPolicyResponse",
+    "RetentionPolicyUpdate",
+    "AccountDeleteOTPResponse",
+    "AccountDeleteRequest",
+    "AccountDeleteResponse",
 ]
