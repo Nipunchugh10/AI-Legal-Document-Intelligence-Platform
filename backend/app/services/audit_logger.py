@@ -49,6 +49,47 @@ def extract_client_info(request: Optional[Request]) -> Tuple[Optional[str], Opti
     return ip_address, user_agent
 
 
+def sanitize_audit_metadata(metadata: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Redacts sensitive credentials (passwords, tokens, OTP codes, API keys)
+    from audit log metadata to prevent credential leakage in compliance logs.
+
+    Day 60 — Security Hardening
+    """
+    if not metadata or not isinstance(metadata, dict):
+        return metadata
+
+    SENSITIVE_KEYS = {
+        "password",
+        "hashed_password",
+        "token",
+        "access_token",
+        "refresh_token",
+        "otp",
+        "code",
+        "secret",
+        "api_key",
+        "gemini_api_key",
+        "authorization",
+    }
+
+    sanitized = {}
+    for key, val in metadata.items():
+        key_lower = str(key).lower()
+        if any(sens in key_lower for sens in SENSITIVE_KEYS):
+            sanitized[key] = "***REDACTED***"
+        elif isinstance(val, dict):
+            sanitized[key] = sanitize_audit_metadata(val)
+        elif isinstance(val, list):
+            sanitized[key] = [
+                sanitize_audit_metadata(item) if isinstance(item, dict) else item
+                for item in val
+            ]
+        else:
+            sanitized[key] = val
+    return sanitized
+
+
 def log_activity(
     db: Session,
     action: str,
@@ -79,6 +120,7 @@ def log_activity(
         safe_status = (status or "SUCCESS")[:20]
         safe_ip = ip_address[:45] if ip_address else None
         safe_ua = user_agent[:255] if user_agent else None
+        safe_metadata = sanitize_audit_metadata(metadata)
 
         entry = AuditLog(
             user_id=user_id,
@@ -87,7 +129,7 @@ def log_activity(
             status=safe_status,
             ip_address=safe_ip,
             user_agent=safe_ua,
-            metadata_json=metadata,
+            metadata_json=safe_metadata,
             timestamp=datetime.now(timezone.utc),
         )
         db.add(entry)

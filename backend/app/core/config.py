@@ -244,6 +244,14 @@ class Settings(BaseSettings):
         "https://huggingface.co",
         "https://*.hf.space",
     ]
+    ALLOWED_HOSTS: Union[List[str], str] = [
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "testserver",
+        "*.hf.space",
+        "huggingface.co",
+    ]
     STRICT_SECURITY_HEADERS: bool = False
     SECURE_COOKIES: bool = False
     ALLOW_HF_IFRAME: bool = True
@@ -291,6 +299,20 @@ class Settings(BaseSettings):
                 except Exception:
                     pass
             return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
+    @field_validator("ALLOWED_HOSTS", mode="before")
+    @classmethod
+    def parse_allowed_hosts(cls, v: Any) -> Any:
+        """Parses comma-separated string or JSON array into a list of strings."""
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("[") and v_stripped.endswith("]"):
+                try:
+                    return json.loads(v_stripped)
+                except Exception:
+                    pass
+            return [host.strip() for host in v.split(",") if host.strip()]
         return v
 
     @model_validator(mode="before")

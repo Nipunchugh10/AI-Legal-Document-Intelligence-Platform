@@ -210,3 +210,79 @@ def get_current_user(
         )
 
     return user
+
+
+# --- File Upload Security & Path Traversal Protection — Day 60 ───────────────
+
+import re
+from pathlib import Path
+
+
+def sanitize_upload_filename(raw_filename: Optional[str]) -> str:
+    """
+    Sanitizes an uploaded document filename to prevent path traversal,
+    null-byte injection, hidden file execution, and filesystem corruption.
+
+    Day 60 — Security Hardening
+
+    Rules:
+    1. Rejects empty, whitespace-only, or None filenames.
+    2. Rejects null bytes (\\0) and control characters.
+    3. Strips both UNIX (/) and Windows (\\\\) path separators.
+    4. Eliminates directory traversal sequences (../, ..\\\\).
+    5. Strips leading dots and whitespace (prevents hidden system files).
+    6. Replaces special/unsafe characters with underscores, preserving extension.
+    7. Truncates length to safe bounds (max 200 chars).
+    8. Fallbacks to 'uploaded_document' if the stem is entirely empty.
+    """
+    if not raw_filename or not raw_filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename cannot be empty.",
+        )
+
+    # 1. Null-byte injection check
+    if "\0" in raw_filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename contains invalid null byte characters.",
+        )
+
+    # 2. Normalize Windows backslashes to forward slashes, then extract base name
+    normalized = raw_filename.replace("\\", "/").strip()
+
+    # Detect blatant path traversal attempts
+    if ".." in normalized.split("/"):
+        pass  # We will strip traversal below, but let's ensure base name is cleanly extracted
+
+    base_name = Path(normalized).name
+
+    # Remove any lingering traversal artifacts
+    base_name = re.sub(r"(\.\./|\.\.\\)", "", base_name)
+    base_name = base_name.replace("..", "").strip()
+
+    # Strip leading dots and spaces (prevents hidden files like .env, .htaccess)
+    base_name = base_name.lstrip(". ")
+
+    if not base_name:
+        base_name = "uploaded_document"
+
+    # Separate stem and suffix
+    path_obj = Path(base_name)
+    stem = path_obj.stem
+    suffix = path_obj.suffix.lower()
+
+    # Clean stem: retain alphanumeric, underscore, hyphen
+    cleaned_stem = re.sub(r"[^a-zA-Z0-9_-]", "_", stem)
+    cleaned_stem = re.sub(r"_+", "_", cleaned_stem).strip("_")
+
+    if not cleaned_stem:
+        cleaned_stem = "uploaded_document"
+
+    # Enforce safe length limit (max 180 chars for stem + suffix)
+    if len(cleaned_stem) > 180:
+        cleaned_stem = cleaned_stem[:180]
+
+    safe_filename = f"{cleaned_stem}{suffix}"
+    return safe_filename
+

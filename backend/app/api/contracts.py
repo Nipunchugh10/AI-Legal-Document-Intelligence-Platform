@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, sanitize_upload_filename
 from app.models.contract import Contract
 from app.models.user import User
 from app.schemas.contract import (
@@ -55,12 +55,13 @@ async def upload_contract(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1. Validate file extension
+    # 1. Sanitize filename to prevent path traversal & control character attacks (Day 60)
+    safe_filename = sanitize_upload_filename(file.filename)
     ALLOWED_EXTENSIONS = {
         ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tiff", ".bmp",
         ".docx", ".doc", ".txt", ".md", ".rtf"
     }
-    file_ext = Path(file.filename).suffix.lower()
+    file_ext = Path(safe_filename).suffix.lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -69,7 +70,6 @@ async def upload_contract(
                 "PDF, Images (PNG, JPG, JPEG, WEBP, TIFF, BMP), Word (.docx), and Text (.txt, .md)."
             ),
         )
-
 
     # 2. Read content and validate file size (max 10MB)
     content = await file.read()
@@ -80,15 +80,21 @@ async def upload_contract(
             detail=f"File size exceeds the maximum limit of {settings.MAX_UPLOAD_SIZE_MB}MB.",
         )
 
-    # 3. Ensure uploads directory exists
-    upload_dir = Path(settings.UPLOAD_DIR)
+    # 3. Ensure uploads directory exists and resolve absolute path
+    upload_dir = Path(settings.UPLOAD_DIR).resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # 4. Generate unique filename to avoid path traversal and collisions
+    # 4. Generate unique filename and verify path containment
     file_uuid = uuid.uuid4()
-    original_filename = Path(file.filename).name
-    unique_filename = f"{file_uuid}_{original_filename}"
-    dest_path = upload_dir / unique_filename
+    unique_filename = f"{file_uuid}_{safe_filename}"
+    dest_path = (upload_dir / unique_filename).resolve()
+
+    # Path traversal validation invariant: destination must be strictly inside upload directory
+    if not dest_path.is_relative_to(upload_dir):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Path traversal detected in upload filename.",
+        )
 
     # 5. Save the file to disk
     try:
@@ -104,7 +110,7 @@ async def upload_contract(
     try:
         db_contract = Contract(
             user_id=current_user.id,
-            filename=original_filename,
+            filename=safe_filename,
             upload_path=str(dest_path),
             status="pending",
         )
@@ -119,7 +125,7 @@ async def upload_contract(
             user_id=current_user.id,
             resource_id=db_contract.id,
             status="SUCCESS",
-            metadata={"filename": original_filename, "size_bytes": len(content)},
+            metadata={"filename": safe_filename, "size_bytes": len(content)},
         )
     except Exception as e:
         # Clean up file on DB failure

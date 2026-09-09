@@ -115,9 +115,11 @@ def send_otp(db: Session, email: str) -> None:
 
     sent = send_smtp_email(normalized_email, subject, body)
     if not sent:
-        # Fallback to console delivery for local development and test environments
-        print(f"[EMAIL MOCK] SENT OTP TO {normalized_email}: {code} (Expires in {OTP_EXPIRY_MINUTES} minutes)")
-        logger.info(f"OTP dispatched (console mock) to {normalized_email}")
+        # Fallback to console delivery ONLY for local development and test environments (Day 60 Security Hardening)
+        if active_settings.APP_ENV in {"development", "test"}:
+            print(f"[EMAIL MOCK] SENT OTP TO {normalized_email}: {code} (Expires in {OTP_EXPIRY_MINUTES} minutes)")
+        else:
+            logger.info("OTP dispatched to %s (mock print suppressed in %s environment)", normalized_email, active_settings.APP_ENV)
 
 
 

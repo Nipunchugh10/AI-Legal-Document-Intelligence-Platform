@@ -176,38 +176,67 @@ async def add_process_time_header(request: Request, call_next):
 
 
 # ------------------------------------------------------------------
-# Enterprise Security Headers Middleware — Day 50
+# Host Header Validation & Trusted Host Middleware — Day 60
+# ------------------------------------------------------------------
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
+allowed_hosts = (
+    list(settings.ALLOWED_HOSTS)
+    if isinstance(settings.ALLOWED_HOSTS, list)
+    else [h.strip() for h in str(settings.ALLOWED_HOSTS).split(",") if h.strip()]
+)
+if "*" not in allowed_hosts:
+    for default_host in ["localhost", "127.0.0.1", "0.0.0.0", "testserver"]:
+        if default_host not in allowed_hosts:
+            allowed_hosts.append(default_host)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=allowed_hosts,
+)
+
+
+# ------------------------------------------------------------------
+# Enterprise Security Headers Middleware — Day 50 & Day 60 Hardening
 # ------------------------------------------------------------------
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
-    """Injects strict security headers when enabled, in staging/production, or in Hugging Face Spaces."""
+    """
+    Injects enterprise-grade HTTP security headers on all responses (Day 60 Security Hardening).
+    - Always enforces nosniff, strict referrer, and restricted permissions.
+    - Tailors frame protections (frame-ancestors for HF Spaces, X-Frame-Options: DENY elsewhere).
+    - Injects HSTS in production or over HTTPS.
+    """
     response = await call_next(request)
     import os
+
+    # Universal security protections across all environments
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
     is_hf_space = bool(
         os.getenv("SPACE_ID")
         or os.getenv("HUGGINGFACE_SPACE")
         or settings.ALLOW_HF_IFRAME
     )
-    should_apply_security_headers = (
+    should_apply_strict_frame_and_tls = (
         settings.STRICT_SECURITY_HEADERS
         or settings.APP_ENV in {"production", "staging"}
         or is_hf_space
     )
-    if should_apply_security_headers:
-        response.headers["X-Content-Type-Options"] = "nosniff"
 
-        if is_hf_space:
-            response.headers["Content-Security-Policy"] = (
-                "frame-ancestors 'self' https://huggingface.co https://*.huggingface.co;"
-            )
-        else:
-            response.headers["X-Frame-Options"] = "DENY"
+    if is_hf_space:
+        response.headers["Content-Security-Policy"] = (
+            "frame-ancestors 'self' https://huggingface.co https://*.huggingface.co;"
+        )
+    elif should_apply_strict_frame_and_tls:
+        response.headers["X-Frame-Options"] = "DENY"
 
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        if request.url.scheme == "https" or settings.APP_ENV == "production":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.scheme == "https" or settings.APP_ENV == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
     return response
 
 
