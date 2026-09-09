@@ -59,6 +59,13 @@ async def compare_contracts(
     """
     Compares two contracts owned by the current user.
     """
+    # 0. Reject self-comparison
+    if payload.base_contract_id == payload.target_contract_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot compare a contract with itself. Please select two distinct contracts.",
+        )
+
     # 1. Fetch and verify baseline contract
     base_contract = (
         db.query(Contract)

@@ -65,6 +65,13 @@ async def ask_contract_question(
             detail="Contract not found or not owned by user.",
         )
 
+    # 1b. Verify contract has been analyzed
+    if contract.status != "analyzed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract must be analyzed before asking questions. Please trigger analysis first.",
+        )
+
     # 2. Invoke the Q&A Agent graph
     initial_state: QAState = {
         "contract_id": contract_id,

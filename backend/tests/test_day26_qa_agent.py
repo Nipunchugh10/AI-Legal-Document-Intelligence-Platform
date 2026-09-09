@@ -94,7 +94,7 @@ def setup_test_environment() -> tuple[str, int, int]:
             user_id=user.id,
             filename="test_qa_agreement.pdf",
             upload_path="uploads/test_qa_agreement.pdf",
-            status="pending"
+            status="analyzed"
         )
         db.add(contract)
         db.commit()
