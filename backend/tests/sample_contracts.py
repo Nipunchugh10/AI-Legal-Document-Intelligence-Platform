@@ -202,3 +202,163 @@ SAMPLE_CONTRACTS = {
     "lease": SAMPLE_CONTRACT_4_LEASE,
     "freelance": SAMPLE_CONTRACT_5_FREELANCE,
 }
+
+SAMPLE_CONTRACT_6_SOFTWARE_LICENSE = """
+ENTERPRISE SOFTWARE LICENSE AGREEMENT
+
+This Software License Agreement ("Agreement") is made effective as of December 1, 2026 ("Effective Date"),
+by and between QuantumBit Systems Inc., a Delaware corporation ("Licensor"),
+and Global Financial Data Corp., a New York corporation ("Licensee").
+
+1. GRANT OF LICENSE
+Subject to the terms of this Agreement, Licensor grants Licensee a non-exclusive, non-sublicensable,
+non-transferable commercial license to install and use the QuantumAnalytics software suite.
+
+2. LICENSE FEES AND PAYMENT TERMS
+Licensee shall pay an annual software license fee of $50,000 USD within thirty (30) days of invoice date ("net-30").
+Late payments shall bear interest at 1.0% per month.
+
+3. INTELLECTUAL PROPERTY RIGHTS
+Licensor retains all right, title, and interest in and to the software, documentation, and all related intellectual property rights.
+Licensee shall not reverse engineer, decompile, or disassemble the binary code.
+
+4. CONFIDENTIALITY
+Each party shall protect the other's proprietary technical information with reasonable care for a period of three (3) years.
+
+5. TERMINATION
+Either party may terminate this Agreement upon thirty (30) days written notice if the other party breaches any material provision
+and fails to cure such breach within the 30-day notice period.
+
+6. LIMITATION OF LIABILITY
+Licensor's total aggregate liability under this Agreement shall not exceed the fees actually paid by Licensee in the twelve (12) months preceding the claim.
+Neither party shall be liable for indirect or consequential damages.
+
+7. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by the laws of the State of Delaware, USA.
+The courts of Delaware shall have exclusive jurisdiction over any disputes.
+"""
+
+SAMPLE_CONTRACT_7_SUPPLY = """
+MASTER PRODUCT PURCHASE AND SUPPLY AGREEMENT
+
+This Supply Agreement ("Agreement") is entered into on November 15, 2026 ("Effective Date"),
+by and between Apex Manufacturing Industries Ltd., an Indian corporation having its office in Pune ("Buyer"),
+and Pacific Hardware Components Pte. Ltd., a Singapore corporation ("Supplier").
+
+1. PURCHASE ORDERS AND DELIVERY
+Supplier shall supply micro-sensor components in accordance with written Purchase Orders issued by Buyer from time to time.
+
+2. PAYMENT TERMS
+Buyer shall make payment within forty-five (45) days of receipt of shipping documents and Bill of Lading ("net-45").
+
+3. TERMINATION FOR CONVENIENCE
+Buyer reserves the right to cancel or terminate any unfulfilled purchase order or this Agreement for convenience
+upon thirty (30) days prior written notice to Supplier.
+
+4. INDEMNIFICATION AND PRODUCT LIABILITY
+Supplier shall unconditionally defend, indemnify, and hold harmless Buyer and its customers against all third-party claims,
+product liability losses, defects, and expenses without any financial cap or limitation whatsoever.
+
+5. DISPUTE RESOLUTION
+Any dispute arising out of this Agreement shall be resolved through binding arbitration administered by the
+Singapore International Arbitration Centre (SIAC) in Singapore in accordance with SIAC Rules.
+
+6. GOVERNING LAW
+This Agreement shall be governed by and construed under the laws of Singapore.
+"""
+
+SAMPLE_CONTRACT_8_IP_ASSIGNMENT = """
+DEED OF INTELLECTUAL PROPERTY ASSIGNMENT
+
+THIS DEED OF ASSIGNMENT is executed on January 15, 2027 ("Effective Date"),
+by and between Kiran Patel, residing in Bangalore, Karnataka, India ("Assignor"),
+and NeuralCraft Robotics Pvt. Ltd., a company incorporated under the Companies Act, 2013, having its office at Electronic City, Bangalore ("Assignee").
+
+1. FULL INTELLECTUAL PROPERTY ASSIGNMENT
+For good and valuable consideration of INR 25,00,000 (receipt of which is hereby acknowledged),
+Assignor hereby irrevocably, perpetually, and unconditionally assigns and transfers to Assignee all worldwide right, title,
+and interest in and to the computer vision algorithms, patent applications, and source code described in Schedule A.
+
+2. STATUTORY SPECIFICATIONS UNDER COPYRIGHT ACT, 1957
+Pursuant to Section 19 of the Indian Copyright Act, 1957:
+(a) The territory of this assignment shall be worldwide (all countries globally);
+(b) The duration of this assignment shall be perpetual and irrevocable;
+(c) Assignor expressly waives the provisions of Section 19(4) of the Copyright Act, confirming that this assignment shall not lapse
+    notwithstanding that Assignee does not exercise the rights assigned within one (1) year;
+(d) Assignor irrevocably waives all moral rights under Section 57 of the Copyright Act.
+
+3. INDEMNITY
+Assignor warrants that the assigned work product is original and does not infringe third-party patents or copyrights,
+and agrees to indemnify Assignee up to the amount of the consideration paid.
+
+4. GOVERNING LAW
+This Deed shall be governed by the laws of India, and the civil courts at Bangalore shall have exclusive jurisdiction.
+"""
+
+SAMPLE_CONTRACT_9_PARTNERSHIP = """
+STRATEGIC PARTNERSHIP AND JOINT DEVELOPMENT AGREEMENT
+
+This Strategic Partnership Agreement ("Agreement") is dated February 1, 2027 ("Effective Date"),
+by and between BioHealth Innovations Inc., a Massachusetts corporation ("BioHealth"),
+and PharmaTech Diagnostics LLC, an Illinois limited liability company ("PharmaTech").
+
+1. SCOPE OF COLLABORATION
+The parties agree to co-develop automated diagnostic reagent platforms as set forth in Project Plan Alpha.
+
+2. TERM AND AUTO-RENEWAL
+This Agreement shall be effective for an initial term of five (5) years from the Effective Date.
+It shall automatically renew for successive two (2) year terms unless either party provides written notice
+of non-renewal at least ninety (90) days prior to the expiration of the current term.
+
+3. CONFIDENTIALITY AND NON-DISCLOSURE
+All proprietary trade secrets and preclinical research data exchanged shall remain strictly confidential for five (5) years.
+Standard exceptions apply for publicly available data and disclosures required by the FDA or courts.
+
+4. MUTUAL LIMITATION OF LIABILITY
+Each party's maximum liability under this Agreement shall be limited to $1,000,000 USD.
+Neither party shall be liable for indirect, special, or consequential damages.
+
+5. DISPUTE RESOLUTION AND GOVERNING LAW
+Any dispute shall be referred to arbitration under the Rules of Arbitration of the International Chamber of Commerce (ICC).
+The seat of arbitration shall be London, United Kingdom.
+"""
+
+SAMPLE_CONTRACT_10_SETTLEMENT = """
+CONFIDENTIAL MUTUAL SETTLEMENT AND RELEASE AGREEMENT
+
+This Settlement and Release Agreement ("Agreement") is made as of March 1, 2027 ("Effective Date"),
+by and between Sterling Logistics Ltd., an Ontario corporation ("Sterling"),
+and Apex Haulage Corp., a Delaware corporation ("Apex").
+
+1. RECITALS AND DISPUTE
+The parties have had commercial disagreements regarding freight billing under Order #8812 and desire to fully and finally settle all claims.
+
+2. SETTLEMENT PAYMENT
+Apex agrees to pay Sterling the sum of $120,000 USD within ten (10) business days of mutual execution of this Agreement.
+
+3. MUTUAL RELEASE AND DISCHARGE
+Upon receipt of the Settlement Payment, each party completely and irrevocably releases, acquits, and forever discharges the other party
+from all claims, liabilities, demands, and causes of action whether known or unknown, arising prior to the Effective Date.
+
+4. CONFIDENTIALITY AND NON-DISPARAGEMENT
+The parties agree that the terms and conditions of this Agreement shall remain strictly confidential,
+except as required for tax filing or legal compliance. Neither party shall make any disparaging public statements regarding the other.
+
+5. GOVERNING LAW
+This Agreement shall be construed in accordance with the substantive laws of the State of New York, USA,
+without giving effect to principles of conflict of laws.
+"""
+
+# Extended 10-Contract Regression Dataset
+SAMPLE_CONTRACTS_10 = {
+    "nda": SAMPLE_CONTRACT_1_NDA,
+    "saas_msa": SAMPLE_CONTRACT_2_SAAS_MSA,
+    "employment": SAMPLE_CONTRACT_3_EMPLOYMENT,
+    "lease": SAMPLE_CONTRACT_4_LEASE,
+    "freelance": SAMPLE_CONTRACT_5_FREELANCE,
+    "software_license": SAMPLE_CONTRACT_6_SOFTWARE_LICENSE,
+    "supply": SAMPLE_CONTRACT_7_SUPPLY,
+    "ip_assignment": SAMPLE_CONTRACT_8_IP_ASSIGNMENT,
+    "partnership": SAMPLE_CONTRACT_9_PARTNERSHIP,
+    "settlement": SAMPLE_CONTRACT_10_SETTLEMENT,
+}
