@@ -69,7 +69,7 @@ jobs:
           PYTHONPATH=.:backend pytest backend/tests/ -v --maxfail=5
 
   frontend-checks:
-    name: Frontend Lint & Production Build
+    name: Frontend Lint, Tests & Production Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -91,6 +91,11 @@ jobs:
         run: |
           cd frontend
           npm run lint
+
+      - name: Run frontend unit & component tests
+        run: |
+          cd frontend
+          npm test
 
       - name: Frontend production build
         run: |
