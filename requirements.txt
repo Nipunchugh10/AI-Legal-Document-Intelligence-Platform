@@ -55,5 +55,6 @@ langchain>=0.3.0
 langchain-google-genai>=2.0.0
 tenacity>=8.2.0
 
-# --- Testing ---
+# --- Testing & Config ---
 pytest>=8.0.0
+PyYAML>=6.0.0

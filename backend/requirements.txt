@@ -58,5 +58,9 @@ langgraph>=0.2.0
 langchain>=0.3.0
 langchain-google-genai>=2.0.0
 tenacity>=8.2.0
+# --- Hugging Face Spaces & Gradio Companion UI (Day 54) ---
+gradio>=6.0.0
+PyYAML>=6.0.0
+
 # --- Testing ---
 pytest>=8.0.0

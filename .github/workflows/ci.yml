@@ -66,7 +66,7 @@ jobs:
           CHROMA_PERSIST_DIR: ./test_chroma_data
           UPLOAD_DIR: ./test_uploads
         run: |
-          PYTHONPATH=backend pytest backend/tests/ -v --maxfail=5
+          PYTHONPATH=.:backend pytest backend/tests/ -v --maxfail=5
 
   frontend-checks:
     name: Frontend Lint & Production Build

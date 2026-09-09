@@ -31,6 +31,9 @@ if str(_ROOT_DIR) not in sys.path:
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
+# Require gradio for this test module to avoid collection errors in minimal environments
+pytest.importorskip("gradio", reason="gradio is required for Hugging Face Spaces Gradio SDK tests")
+
 import space_app as space_module
 from app.main import app as fastapi_app
 
