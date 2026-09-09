@@ -549,6 +549,21 @@ def resend_2fa_otp(
     }
 
 
+# ── GET /auth/oauth-config ───────────────────────────────────────────────────
+
+@router.get(
+    "/oauth-config",
+    summary="Get public OAuth client configurations",
+    description="Returns public client IDs (such as Google OAuth Client ID) for client-side SDK initialization.",
+)
+def get_oauth_config() -> dict[str, str]:
+    from app.core.config import get_settings
+    settings = get_settings()
+    return {
+        "google_client_id": settings.GOOGLE_CLIENT_ID or ""
+    }
+
+
 # ── POST /auth/google-login ────────────────────────────────────────────────────
 
 @router.post(
@@ -575,10 +590,11 @@ def google_login(
 
     # 1. Verify Google Credential Token
     try:
+        audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
         id_info = id_token.verify_oauth2_token(
             body.credential,
             google_requests.Request(),
-            settings.GOOGLE_CLIENT_ID
+            audience
         )
     except ValueError as e:
         raise HTTPException(

@@ -80,13 +80,25 @@ export const Login: React.FC = () => {
 
     let intervalId: any;
 
-    const initGoogle = () => {
-      const google = window.google;
-      const client_id = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    let fetchedClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-      if (google && client_id) {
+    const initGoogle = async () => {
+      const google = window.google;
+
+      if (!fetchedClientId) {
+        try {
+          const res = await api.get("/auth/oauth-config");
+          if (res.data?.google_client_id) {
+            fetchedClientId = res.data.google_client_id;
+          }
+        } catch {
+          // ignore network errors if backend is booting
+        }
+      }
+
+      if (google && fetchedClientId) {
         google.accounts.id.initialize({
-          client_id: client_id,
+          client_id: fetchedClientId,
           callback: handleGoogleCredentialResponse,
         });
 
