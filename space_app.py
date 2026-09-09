@@ -49,7 +49,19 @@ def run_startup_migrations():
 from app.main import app as fastapi_app
 import gradio as gr
 
+# ZeroGPU Support for Hugging Face Spaces (100% Free A10G Acceleration)
+try:
+    import spaces
+except ImportError:
+    class _MockSpaces:
+        def GPU(self, func=None, **kwargs):
+            if func is None:
+                return lambda f: f
+            return func
+    spaces = _MockSpaces()
+
 # Build companion Gradio Quick-Analysis Workspace
+@spaces.GPU
 def analyze_clause_quick(clause_text: str, analysis_type: str) -> str:
     """Quick LLM-powered clause analyzer for the Gradio interface."""
     if not clause_text or not clause_text.strip():
