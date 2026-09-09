@@ -136,6 +136,12 @@ def login(
 
     # Generic error message to prevent account enumeration
     if not user or not verify_password(body.password, user.hashed_password):
+        try:
+            from app.core.telemetry import metrics_collector
+            metrics_collector.record_auth_failure("invalid_credentials", client_ip=request.client.host if request.client else "")
+        except Exception:
+            pass
+
         log_activity(
             db=db,
             action=AuditEventType.USER_LOGIN_FAILED.value,
@@ -212,6 +218,12 @@ def login(
         metadata={"email": user.email},
         request=request,
     )
+
+    try:
+        from app.core.telemetry import metrics_collector
+        metrics_collector.record_auth_success()
+    except Exception:
+        pass
 
     return TokenResponse(
         access_token=access_token,
@@ -449,6 +461,12 @@ def login_verify_2fa(
         )
 
     # 3. Verify OTP
+    try:
+        from app.core.telemetry import metrics_collector
+        metrics_collector.record_otp_attempt()
+    except Exception:
+        pass
+
     verify_otp(db, user.email, body.otp_code)
 
     # 4. Success! Issue real session and tokens
@@ -462,6 +480,12 @@ def login_verify_2fa(
         ip_address=ip_address,
     )
     access_token = create_access_token(data={"sub": user.email, "session_id": session_id})
+
+    try:
+        from app.core.telemetry import metrics_collector
+        metrics_collector.record_auth_success()
+    except Exception:
+        pass
 
     # Day 46: Audit Logging
     log_activity(

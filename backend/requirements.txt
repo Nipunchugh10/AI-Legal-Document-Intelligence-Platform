@@ -24,6 +24,12 @@ bcrypt==4.2.1          # pin to 4.x — bcrypt 5.x is incompatible with passlib 
 email-validator==2.3.0 # required for Pydantic EmailStr (added Day 4)
 slowapi==0.1.10        # rate limiting for auth endpoints (Day 54)
 
+# --- OpenTelemetry & Observability (Day 55) ---
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-instrumentation-sqlalchemy>=0.45b0
+
 # --- File Uploads ---
 python-multipart==0.0.12
 

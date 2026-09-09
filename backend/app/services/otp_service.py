@@ -156,6 +156,11 @@ def verify_otp(db: Session, email: str, submitted_code: str) -> bool:
 
     # Check expiration
     if otp_entry.expires_at < now:
+        try:
+            from app.core.telemetry import metrics_collector
+            metrics_collector.record_auth_failure("expired_otp")
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OTP code has expired. Please request a new code.",
@@ -166,6 +171,12 @@ def verify_otp(db: Session, email: str, submitted_code: str) -> bool:
     if otp_entry.otp_hash != submitted_hash:
         otp_entry.attempts += 1
         db.commit()
+
+        try:
+            from app.core.telemetry import metrics_collector
+            metrics_collector.record_auth_failure("invalid_otp")
+        except Exception:
+            pass
 
         remaining = MAX_OTP_ATTEMPTS - otp_entry.attempts
         if remaining <= 0:

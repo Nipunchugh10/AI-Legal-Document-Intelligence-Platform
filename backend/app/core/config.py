@@ -256,6 +256,12 @@ class Settings(BaseSettings):
     RATE_LIMIT_REGISTER: str = "5/minute"
     RATE_LIMIT_STORAGE_URL: str = "memory://"
 
+    # --- OpenTelemetry & Observability (Day 55) ---
+    OTEL_ENABLED: bool = True
+    OTEL_SERVICE_NAME: str = "legal-ai-platform"
+    OTEL_SERVICE_VERSION: str = "1.0.0"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""
+
     # --- File Upload ---
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 10

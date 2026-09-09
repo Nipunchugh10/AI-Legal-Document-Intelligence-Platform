@@ -99,6 +99,13 @@ def custom_rate_limit_exceeded_handler(
         exc.detail,
     )
 
+    try:
+        from app.core.telemetry import metrics_collector
+        metrics_collector.record_auth_failure("rate_limit_exceeded", client_ip=get_client_ip(request))
+        metrics_collector.record_error("rate_limit", 429, request.url.path)
+    except Exception:
+        pass
+
     return JSONResponse(
         status_code=429,
         content={

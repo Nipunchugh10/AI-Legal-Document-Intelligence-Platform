@@ -16,9 +16,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
+from typing import Optional
 from app.core.config import get_settings
 from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter, custom_rate_limit_exceeded_handler
+from app.core.telemetry import setup_telemetry, metrics_collector
+from app.core.database import engine
 from app.api import auth as auth_router
 from app.api import contracts as contracts_router
 from app.api import qa as qa_router
@@ -109,6 +112,9 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
 
+# OpenTelemetry & Observability Auto-Instrumentation — Day 55
+setup_telemetry(app, engine=engine)
+
 
 # ------------------------------------------------------------------
 # CORS Middleware — Day 50 Dynamic Origins
@@ -137,11 +143,35 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
-    """Measures total processing time and injects X-Process-Time response header."""
+    """Measures total processing time, injects X-Process-Time header, and records OpenTelemetry metrics."""
     start_time = time.perf_counter()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        process_time = time.perf_counter() - start_time
+        metrics_collector.record_api_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=500,
+            duration_seconds=process_time,
+        )
+        metrics_collector.record_error("server_error", 500, request.url.path)
+        raise exc
+
     process_time = time.perf_counter() - start_time
     response.headers["X-Process-Time"] = f"{process_time * 1000:.2f}ms"
+
+    # Record API request latency & status in telemetry (Day 55)
+    metrics_collector.record_api_request(
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_seconds=process_time,
+    )
+    if response.status_code >= 400:
+        err_type = "client_error" if response.status_code < 500 else "server_error"
+        metrics_collector.record_error(err_type, response.status_code, request.url.path)
+
     return response
 
 
@@ -293,6 +323,10 @@ async def health_check():
         "status": "ok",
         "environment": settings.APP_ENV,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "telemetry": {
+            "active": settings.OTEL_ENABLED,
+            "total_requests": metrics_collector.total_requests,
+        },
     }
 
 
@@ -311,6 +345,28 @@ async def db_health_check():
     diag = check_database_connection()
     status_code = 200 if diag["status"] == "connected" and diag.get("core_tables_healthy") else 503
     return JSONResponse(status_code=status_code, content=diag)
+
+
+@app.get(
+    "/metrics",
+    tags=["System"],
+    summary="OpenTelemetry & Prometheus Metrics",
+    description="Returns real-time platform metrics in standard Prometheus exposition text format or structured JSON.",
+)
+async def metrics_endpoint(request: Request, format: Optional[str] = None):
+    """
+    Prometheus & OpenTelemetry metrics scrape endpoint (Day 55).
+    Returns standard Prometheus exposition format (text/plain) by default.
+    Returns application/json when requested via '?format=json' or Accept header.
+    """
+    from fastapi.responses import PlainTextResponse
+    accept = request.headers.get("accept", "")
+    if format == "json" or "application/json" in accept:
+        return JSONResponse(content=metrics_collector.get_snapshot())
+    return PlainTextResponse(
+        content=metrics_collector.get_prometheus_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 

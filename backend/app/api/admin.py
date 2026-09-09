@@ -58,3 +58,21 @@ async def get_db_health(
     logger.info("Admin DB health check requested by user_id=%s", current_user.id)
     return check_database_connection()
 
+
+@router.get(
+    "/telemetry",
+    status_code=status.HTTP_200_OK,
+    summary="Get OpenTelemetry Platform Metrics & Anomaly Diagnostics",
+    description="Returns comprehensive latency percentiles, error rates, DB query stats, and auth anomalies.",
+)
+async def get_platform_telemetry(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns comprehensive real-time OpenTelemetry operational metrics and anomaly diagnostics.
+    Protected endpoint accessible by authenticated users/administrators.
+    """
+    from app.core.telemetry import metrics_collector
+    logger.info("Admin platform telemetry requested by user_id=%s", current_user.id)
+    return metrics_collector.get_snapshot()
+

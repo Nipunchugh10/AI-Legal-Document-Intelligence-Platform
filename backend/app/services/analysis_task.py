@@ -7,6 +7,7 @@ Persists intermediate findings and updates contract status upon completion or fa
 Day 42 — Async Background Processing
 """
 
+import time
 import logging
 from pathlib import Path
 from typing import Any, Dict
@@ -46,6 +47,7 @@ def run_analysis_workflow_task(contract_id: int, user_id: int) -> None:
     Background worker task to execute the full LangGraph multi-agent analysis workflow.
     Uses an independent database session to track lifecycle state and persist findings.
     """
+    start_time = time.perf_counter()
     logger.info("Starting background analysis workflow for contract_id=%s, user_id=%s", contract_id, user_id)
     db = SessionLocal()
     try:
@@ -152,6 +154,14 @@ def run_analysis_workflow_task(contract_id: int, user_id: int) -> None:
         db.commit()
         logger.info("Background analysis workflow completed successfully for contract_id=%s", contract_id)
 
+        # Day 55: OpenTelemetry Duration Tracking
+        duration = time.perf_counter() - start_time
+        try:
+            from app.core.telemetry import metrics_collector
+            metrics_collector.record_analysis_duration(duration, success=True, contract_id=contract_id)
+        except Exception:
+            pass
+
         # Day 46: Audit Logging
         log_activity(
             db=db,
@@ -168,6 +178,12 @@ def run_analysis_workflow_task(contract_id: int, user_id: int) -> None:
 
     except Exception as exc:
         logger.exception("Unexpected exception in background analysis for contract_id=%s: %s", contract_id, exc)
+        duration = time.perf_counter() - start_time
+        try:
+            from app.core.telemetry import metrics_collector
+            metrics_collector.record_analysis_duration(duration, success=False, contract_id=contract_id)
+        except Exception:
+            pass
         try:
             contract = db.query(Contract).filter(Contract.id == contract_id).first()
             if contract:
