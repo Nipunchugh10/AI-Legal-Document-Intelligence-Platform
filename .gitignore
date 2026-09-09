@@ -7,7 +7,11 @@ dist/
 build/
 *.egg
 !frontend/dist/
-!frontend/dist/**
+!frontend/dist/index.html
+!frontend/dist/favicon.svg
+!frontend/dist/icons.svg
+!frontend/dist/assets/
+!frontend/dist/assets/**
 venv/
 .venv/
 venv_linux/

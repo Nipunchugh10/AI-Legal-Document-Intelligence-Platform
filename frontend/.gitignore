@@ -8,9 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# dist tracked for zero-node cloud deployments (e.g. Hugging Face Spaces Gradio SDK)
 !dist/
 !dist/**
+dist/*.jpg
+dist/*.jpeg
+dist/*.png
+dist/*.webp
 dist-ssr
 *.local
 

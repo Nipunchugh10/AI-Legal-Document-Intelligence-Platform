@@ -63,31 +63,37 @@ export const Register: React.FC = () => {
   // Initialize Google Sign-In SDK
   useEffect(() => {
     let intervalId: any;
-
-    let fetchedClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    let isInitialized = false;
 
     const initGoogle = async () => {
+      if (isInitialized) return;
       const google = window.google;
+      if (!google) return;
 
-      if (!fetchedClientId) {
-        try {
-          const res = await api.get("/auth/oauth-config");
-          if (res.data?.google_client_id) {
-            fetchedClientId = res.data.google_client_id;
-          }
-        } catch {
-          // ignore network errors if backend is booting
+      let clientId = "";
+      try {
+        const res = await api.get("/auth/oauth-config");
+        if (res.data?.google_client_id) {
+          clientId = res.data.google_client_id;
         }
+      } catch {
+        // ignore network errors if backend is booting
       }
 
-      if (google && fetchedClientId) {
+      if (!clientId) {
+        clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+      }
+
+      if (google && clientId && !isInitialized) {
+        isInitialized = true;
         google.accounts.id.initialize({
-          client_id: fetchedClientId,
+          client_id: clientId,
           callback: handleGoogleCredentialResponse,
         });
 
         const btnElement = document.getElementById("google-signin-btn");
         if (btnElement) {
+          btnElement.innerHTML = "";
           google.accounts.id.renderButton(btnElement, {
             theme: "outline",
             size: "large",
@@ -108,10 +114,10 @@ export const Register: React.FC = () => {
     intervalId = setInterval(() => {
       attempts++;
       initGoogle();
-      if (attempts > 25) {
+      if (attempts > 30 || isInitialized) {
         clearInterval(intervalId);
       }
-    }, 200);
+    }, 300);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
