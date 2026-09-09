@@ -160,4 +160,39 @@ describe("LoginPage Component Tests", () => {
     await user.click(toggleBtn);
     expect(passwordInput.type).toBe("password");
   });
+
+  it("executes 1-click Try Demo login with pre-configured demo credentials", async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: {
+        access_token: "demo-access-token",
+        refresh_token: "demo-refresh-token",
+        requires_2fa: false,
+      },
+    });
+
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/auth/me") {
+        return { data: { ...mockUser, email: "demo@legalai.com" } };
+      }
+      return { data: { google_client_id: "test-client-id" } };
+    });
+
+    renderWithProviders(<Login />);
+
+    const tryDemoBtn = screen.getByRole("button", { name: /Try Demo/i });
+    expect(tryDemoBtn).toBeInTheDocument();
+    fireEvent.click(tryDemoBtn);
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith("/auth/login", {
+        email: "demo@legalai.com",
+        password: "DemoPassword2026!",
+      });
+    });
+
+    await waitFor(() => {
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(useAuthStore.getState().user?.email).toBe("demo@legalai.com");
+    });
+  });
 });

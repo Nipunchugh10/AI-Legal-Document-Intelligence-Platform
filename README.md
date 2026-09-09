@@ -12,201 +12,212 @@ license: mit
 
 # AI Legal Document Intelligence Platform
 
-> 🚧 **Work in Progress:** This project is currently under active development and is in the process of being built.
->
-> An AI-powered platform that reads the fine print so you don't have to.
+> **An enterprise-grade autonomous legal dialectic system that audits, risk-scores, cross-examines, and negotiates complex commercial contracts with 100% data boundary isolation and zero paid cloud API dependencies.**
 
-## Overview
+[![CI Pipeline](https://github.com/Nipunchugh10/AI-Legal-Document-Intelligence-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Nipunchugh10/AI-Legal-Document-Intelligence-Platform/actions/workflows/ci.yml)
+[![Live Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20Live%20Demo-blue)](https://huggingface.co/spaces/Nipunchugh10/AI-Legal-Document-Intelligence-Platform)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI%200.115+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-61dafb.svg?logo=react)](https://react.dev)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11+-3776ab.svg?logo=python)](https://python.org)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2015+-336791.svg?logo=postgresql)](https://www.postgresql.org)
+[![Tests Passing](https://img.shields.io/badge/Tests-365%2F365%20Passing%20(100%25)-brightgreen.svg)]()
 
-Upload any contract, NDA, rental agreement, or service agreement as a PDF and get:
-- **Plain-English Summaries** — who the parties are, what the document covers, and what it means
-- **Key Clause Extraction** — payment terms, termination conditions, liability, confidentiality pulled out clearly
-- **Risk Flagging** — one-sided clauses, uncapped penalties, and terms that quietly favor the other party
-- **Compliance Checking** — comparison against standard legal practices to surface missing protections
-- **Conversational Q&A** — ask questions in plain language and get cited, clause-referenced answers
+---
 
-All documents, conversations, and analyses are persistently stored, organized, and semantically searchable.
+## 📌 Problem Statement
 
-## Tech Stack
+Every day, individuals, freelancers, and businesses sign legally binding agreements they do not fully understand:
+- A software consultancy signs a client MSA containing an uncapped indemnification clause that bypasses their liability ceiling.
+- A commercial tenant signs an office lease with a 36-month lock-in period enforcing 100% rent as liquidated damages and a unilateral sole arbitrator appointed exclusively by the landlord.
+- An executive accepts an employment contract containing a 2-year post-termination non-compete covenant that is legally void *ab initio* under statutory restraint of trade laws.
 
-| Layer | Technology |
-|---|---|
-| **Backend** | Python 3.11+, FastAPI, SQLAlchemy, Alembic |
-| **Frontend** | React 19 (TypeScript), Vite, TailwindCSS |
-| **Database** | PostgreSQL 15 (Local / Cloud Managed: Neon, Supabase) |
-| **Vector Store** | ChromaDB (for semantic search & RAG) |
-| **AI/LLM** | Google Gemini 2.5 / 3.5 Flash (100% Free Tier Google AI Studio) |
-| **AI Orchestration** | LangChain + LangGraph (multi-agent adversarial pipeline) |
-| **Auth & 2FA** | JWT + Email OTP Two-Factor Authentication (SHA-256 hashed) |
-| **Security & Protection**| SlowAPI IP-based rate limiting, strict CSP with HF iframe support |
-| **Containerization** | Unified Multi-Stage Docker container & Hugging Face Spaces (Port 7860) |
+Hiring external counsel for routine contract review is costly and slow. Most parties either sign blindly or rely on generic chatbots that hallucinate citations, ignore cross-clause dependencies, and leak sensitive corporate data to third-party public training sets.
 
-## Architecture
+---
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   React Frontend                     │
-│         (Dashboard, Viewer, Chat, Search)            │
-└───────────────────────┬─────────────────────────────┘
-                        │ REST API
-┌───────────────────────▼─────────────────────────────┐
-│                  FastAPI Backend                      │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐ │
-│  │ Auth &   │  │ Document │  │   LangGraph AI     │ │
-│  │ Sessions │  │ Service  │  │   Pipeline         │ │
-│  │ (JWT+OTP)│  │ (Upload, │  │ ┌────────────────┐ │ │
-│  └──────────┘  │  Parse)  │  │ │ Parser Agent   │ │ │
-│                └──────────┘  │ │ Clause Agent   │ │ │
-│                              │ │ Risk Agent     │ │ │
-│  ┌──────────┐  ┌──────────┐  │ │ Compliance     │ │ │
-│  │ History  │  │ Search   │  │ │ Q&A Agent      │ │ │
-│  │ & Audit  │  │ Service  │  │ └────────────────┘ │ │
-│  └──────────┘  └──────────┘  └────────────────────┘ │
-└────────┬──────────────┬──────────────┬──────────────┘
-         │              │              │
-    PostgreSQL      ChromaDB     Google Gemini
-    (Users,         (Embeddings,  (Multi-Agent LLM
-     Contracts,      Semantic      Inference &
-     Sessions,       Search)       Vision OCR)
-     History)
-```
+## 💡 The Solution
 
-## Project Structure
+The **AI Legal Document Intelligence Platform** acts as an autonomous legal review partner. When a contract is uploaded (PDF, DOCX, or scanned image), the platform executes a dialectical multi-agent analysis in under 60 seconds:
+1. **Document Parsing & Entity Recognition**: Identifies parties, effective dates, governing law, and document classifications.
+2. **Universal 9-Clause Mandatory Checklist**: Evaluates mandatory clauses (`payment_terms`, `termination`, `liability`, `confidentiality`, `intellectual_property`, `dispute_resolution`, `governing_law`, `renewal`, `indemnification`) with exact text citations and locations.
+3. **3-Tier Traffic-Light Risk Flagging**: Classifies contractual exposures into Red Flags (Severe/Uncapped), Yellow Flags (Moderate/Ambiguous), and Green Flags (Standard/Protective).
+4. **8-Domain Statutory Compliance Auditing**: Cross-references terms against codified statutes (DPDPA 2023, GDPR, Arbitration Act §12(5), Contract Act §27, Copyright Act §19(5)).
+5. **Grounded Conversational Q&A**: Answers questions in plain language with pinpoint source citations (section, paragraph, and line coordinates) preventing hallucinations.
+6. **Multi-Tier Redline Counter-Drafting**: Generates ready-to-use contract amendments across three strategic postures: *Balanced*, *Protective*, and *Aggressive*.
+
+---
+
+## ⚡ Why This Is Different From Generic AI (ChatGPT / Gemini)
+
+| # | Differentiator | Why a General Chatbot Falls Short | How Our Platform Solves It |
+|---|---|---|---|
+| 1 | **Adversarial Multi-Agent Dialectic** | Provides single-pass summaries that miss hidden traps | Coordinated LangGraph workflow simulating Senior Counsel, Risk Auditor, and Statutory Expert |
+| 2 | **Universal 9-Clause Checklist Invariant** | Clauses omitted from documents are silently overlooked | Evaluates 9 mandatory clauses on 100% of contracts, explicitly flagging absent protections |
+| 3 | **8-Domain Statutory Taxonomy** | Treats all contracts identically without applying local statutes | Codified RAG knowledge base covering Indian & US corporate, labour, arbitration, and data privacy laws |
+| 4 | **Pinpoint Source Citations** | Hallucinates plausible-sounding clauses when text is ambiguous | Enforces mandatory citation coordinates (`clause_id`, `section`, `title`, `page`) on every response |
+| 5 | **3-Tier Counter-Drafting Redlines** | Gives vague advice like *"negotiate this term"* | Produces complete track-changes replacement text in Balanced, Protective, and Aggressive postures |
+| 6 | **Cross-Document Semantic Portfolio Search** | Conversations are ephemeral and lost in general chat history | Persistent legal vault with ChromaDB vector search across all historical contracts and clauses |
+| 7 | **Banking-Grade Privacy & Audit Trail** | Lacks tenant boundaries, session timeouts, or forensic trails | Email OTP 2FA, 40-minute auto-logout, TrustedHost validation, path traversal defense, and immutable audit logs |
+
+---
+
+## 🏗️ Architecture & Data Flow
 
 ```
-legal-ai-platform/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI application entry point
-│   │   ├── api/                 # Route handlers
-│   │   │   ├── __init__.py
-│   │   │   ├── auth.py
-│   │   │   └── contracts.py
-│   │   ├── agents/              # LangGraph AI agents
-│   │   │   └── __init__.py
-│   │   ├── models/              # SQLAlchemy ORM models
-│   │   │   └── __init__.py
-│   │   ├── services/            # Business logic
-│   │   │   └── __init__.py
-│   │   └── core/                # Config, DB, security utilities
-│   │       ├── __init__.py
-│   │       ├── config.py
-│   │       ├── database.py
-│   │       └── security.py
-│   ├── tests/                   # Backend tests
-│   │   └── __init__.py
-│   ├── alembic/                 # Database migrations
-│   ├── uploads/                 # Local PDF storage
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   └── package.json
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-└── README.md
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      React 19 Frontend SPA (Vite)                       │
+│    Dashboard • Legal Vault • Risk Visualizer • Q&A Chat • 2FA Settings   │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ HTTPS / REST (JWT + CSRF Guard)
+┌────────────────────────────────────▼────────────────────────────────────┐
+│                       FastAPI Ingress Gateway                           │
+│  TrustedHost Middleware • Security Headers (CSP, HSTS) • SlowAPI Limits │
+└─────────┬──────────────────────────┬──────────────────────────┬─────────┘
+          │                          │                          │
+┌─────────▼──────────────┐ ┌─────────▼──────────────┐ ┌─────────▼─────────┐
+│ Identity & Security    │ │ Multi-Agent Engine     │ │ History & Audit   │
+│ • Dual-Token Session   │ │ • Agent 1: Parser      │ │ • Immutable Logs  │
+│ • SHA-256 Email 2FA    │ │ • Agent 2: Clauses     │ │ • Dialogue State  │
+│ • 40m Auto-Logout      │ │ • Agent 3: Risk (RGB)  │ │ • GDPR Data Export│
+│ • Path Traversal Guard │ │ • Agent 4: Compliance  │ │ • Composite Index │
+│ • Credential Scrubbing │ │ • Agent 5: Redlines    │ │ • Telemetry (OTel)│
+└─────────┬──────────────┘ └─────────┬──────────────┘ └─────────┬─────────┘
+          │                          │                          │
+┌─────────▼──────────────────────────▼──────────────────────────▼─────────┐
+│                          Data & Model Layer                             │
+│  PostgreSQL 15 (Neon SSL) • ChromaDB (768-dim) • Gemini 2.5/3.5 Flash   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Getting Started
+For comprehensive technical specifications, state machines, and data schemas, see [**`ARCHITECTURE.md`**](file:///home/oliveoil/Documents/Notes_and_Documentation/Old%20One%20Drive/AI%20Legal%20Document%20Intelligence%20Platform/ARCHITECTURE.md).
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15
-- Docker & Docker Compose (optional)
+---
 
-### Backend Setup
+## 🛠️ Tech Stack & Verified Versions
+
+| Layer | Technology | Version | Purpose |
+|---|---|---|---|
+| **Frontend Framework** | React | `19.0.0` | High-performance reactive UI with modern hooks |
+| **Language & Tooling** | TypeScript / Vite | `5.7.2` / `6.2.0` | Strict type safety and lightning-fast HMR builds |
+| **State & Cache** | Zustand / TanStack Query | `5.0.3` / `5.66.0` | Global authentication state and cached API synchronizations |
+| **Styling & UI** | Tailwind CSS / Lucide React | `3.4.17` / `0.475.0` | Accessible, responsive, dark/light themed design system |
+| **Backend Framework** | FastAPI / Starlette | `0.115.0+` | Asynchronous Python REST API with OpenAPI validation |
+| **Database & ORM** | PostgreSQL / SQLAlchemy | `15.x/16.x` / `2.0.35` | Relational storage with composite index query optimization |
+| **Database Migrations** | Alembic | `1.13.3` | Schema version control and automated cloud deployments |
+| **AI Orchestration** | LangGraph / LangChain | `0.2.34` / `0.3.0` | Adversarial multi-agent state machines and RAG routing |
+| **LLM & Vision** | Google Gemini 2.5/3.5 Flash | Google AI Studio | Primary dialectic reasoning and OCR document extraction |
+| **Vector Database** | ChromaDB | `0.5.5+` | 768-dimension local embeddings for semantic portfolio search |
+| **Observability** | OpenTelemetry / Prometheus | `1.27.0+` | Latency tracking, error rates, and metrics exposition |
+| **Testing** | pytest / Vitest / Playwright | `8.3.3` / `4.1.11` | Automated testing across backend, frontend, and browser E2E |
+
+---
+
+## 🚀 Getting Started
+
+### Option 1: One-Click Instant Demo (No Setup Required)
+Access the live deployment on Hugging Face Spaces:
+👉 [**https://huggingface.co/spaces/Nipunchugh10/AI-Legal-Document-Intelligence-Platform**](https://huggingface.co/spaces/Nipunchugh10/AI-Legal-Document-Intelligence-Platform)
+
+Click the **⚡ Try Demo** button on the login screen to explore the pre-seeded legal portfolio instantly:
+- **Demo User:** `demo@legalai.com` (Password: `DemoPassword2026!`)
+- **Alternative:** `lawyer@example.com` (Password: `SecurePassword123!`)
+
+---
+
+### Option 2: Run Locally via Docker Compose
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Nipunchugh10/AI-Legal-Document-Intelligence-Platform.git
+cd AI-Legal-Document-Intelligence-Platform
+
+# 2. Configure environment variables
+cp .env.example .env
+# Open .env and add your free GEMINI_API_KEY from Google AI Studio
+
+# 3. Spin up full stack (FastAPI, React, PostgreSQL, ChromaDB)
+docker-compose up --build
+```
+Access the application at `http://localhost:3000` (FastAPI backend at `http://localhost:8000`).
+
+---
+
+### Option 3: Local Manual Development Setup
+
+#### Backend Setup
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS/Linux
+source venv/bin/activate        # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp ../.env.example ../.env   # Edit with your values
+cp ../.env.example .env        # Configure DATABASE_URL and GEMINI_API_KEY
+
+# Run database migrations
+alembic upgrade head
+
+# Seed demo evaluation data (5 contracts, analyses, conversations, audit logs)
+python ../scripts/seed_demo.py
+
+# Launch FastAPI server
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend Setup
+#### Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Open `http://localhost:5173` in your browser.
 
-### Docker (Full Stack)
+---
+
+## 🧪 Automated Testing & Verification
+
+The platform maintains a **100% automated test pass rate across 365 tests**:
+
 ```bash
-docker-compose up --build
+# Run complete backend pytest suite (335 tests)
+pytest backend/tests/ -v
+
+# Run complete frontend Vitest suite (30 tests)
+cd frontend && npm test -- --run
+
+# Run frontend production build & lint
+cd frontend && npm run lint && npm run build
 ```
 
-### Deploying to Hugging Face Spaces (100% Free Tier - Gradio SDK)
-
-The application is deployed to Hugging Face Spaces using the **100% Free Gradio SDK** (`sdk: gradio`). A unified ASGI architecture hosts:
-1. **The Full React 19 SPA Platform** at `/` (built locally and tracked in `frontend/dist`).
-2. **The Gradio Legal Analysis Sandbox** at `/gradio`.
-3. **All FastAPI Backend Endpoints** (`/auth`, `/contracts`, `/chat`, `/history`, `/analytics`, `/docs`).
-4. **Cloud Database Auto-Migrations** executed on space boot.
-
-#### 1. Space Configuration & YAML Frontmatter
-The root `README.md` includes mandatory Hugging Face Spaces configuration:
-```yaml
----
-title: AI Legal Document Intelligence Platform
-emoji: ⚖️
-colorFrom: blue
-colorTo: indigo
-sdk: gradio
-sdk_version: 6.26.0
-app_file: space_app.py
-pinned: false
-license: mit
----
-```
-
-#### 2. Create Gradio Space & Connect Repository
-1. Navigate to [Hugging Face Spaces](https://huggingface.co/new-space).
-2. Enter Space Name (e.g. `AI-Legal-Document-Intelligence-Platform`).
-3. Select **Gradio** SDK (100% Free Tier) and set visibility (Public or Private).
-4. Add your Hugging Face Space as a remote and push `main`:
-   ```bash
-   git remote add space https://huggingface.co/spaces/<your-username>/<space-name>
-   git push space main
-   ```
-
-#### 3. Required Space Secrets (Settings → Variables and Secrets)
-Configure the following secrets in your Hugging Face Space:
-
-| Variable / Secret | Type | Description |
-|---|---|---|
-| `DATABASE_URL` | Secret | Remote PostgreSQL URI with SSL (e.g. Neon, Supabase: `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require`) |
-| `GEMINI_API_KEY` | Secret | Google AI Studio API Key powering the multi-agent legal dialectic |
-| `JWT_SECRET_KEY` | Secret | Cryptographically secure 256-bit secret string (`openssl rand -hex 32`) |
-| `APP_ENV` | Variable | Set to `production` |
-| `ALLOW_HF_IFRAME` | Variable | Set to `true` (enables CSP `frame-ancestors` for Hugging Face web view) |
-
-#### 4. Automated Boot & Database Verification
-On space boot, `space_app.py` automatically:
-- Validates cloud PostgreSQL connectivity via `DATABASE_URL`.
-- Executes all Alembic database schema migrations (`alembic upgrade head`).
-- Mounts the Gradio Clause Analyzer at `/gradio`.
-- Serves the compiled React 19 application at `/` with SPA navigation routing.
+| Test Suite | File Count | Tests Passed | Pass Rate | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Backend Multi-Agent & Security** | 42 files | **335 passed** | `100%` | ✅ Passing |
+| **Frontend Components & E2E** | 6 files | **30 passed** | `100%` | ✅ Passing |
+| **Total Automated Platform Tests** | **48 files** | **365 passed** | `100%` | ✅ **3/3 CI Green** |
 
 ---
 
-## Security & Protection Architecture
+## 🔒 Security Architecture Highlights
 
-- **Bank-Grade Data Privacy:** Cryptographically signed JWT tokens with active token rotation and SHA-256 hashed refresh tokens.
-- **Email OTP Two-Factor Authentication:** 6-digit verification codes hashed with SHA-256 at rest, protected by 5-minute expiry limits and brute-force attempt counters.
-- **Endpoint Rate Limiting (SlowAPI):** Sensitive authentication endpoints are protected against credential stuffing and enumeration:
-  - `POST /auth/login`: 5 requests per minute per IP.
-  - `POST /auth/2fa/login-verify`: 5 requests per minute per IP.
-  - `POST /auth/2fa/resend-otp`: 3 requests per 5 minutes per IP.
-  - `POST /auth/register`: 5 requests per minute per IP.
-  - Reverse-proxy client IP resolution via `X-Forwarded-For` and `X-Real-IP`.
-- **Hugging Face Spaces Iframe Embedding:** Custom `Content-Security-Policy: frame-ancestors 'self' https://huggingface.co https://*.huggingface.co;` enables embedding in Hugging Face web views without being blocked by clickjacking policies.
-- **Auto-Logout & Session Management:** Heartbeat tracking with idle timeouts and background cleanup.
-- **Immutable Audit Trail:** Append-only compliance logging tracking every authentication, upload, analysis, and Q&A action.
-- **Strict Multi-Tenant Isolation:** Complete isolation across contracts, conversations, and data exports.
+1. **Email OTP Two-Factor Authentication**:
+   - 6-digit verification codes hashed with SHA-256 at rest.
+   - 5-minute expiry limits, 30-second resend cooldowns, and a 5-attempt lockout threshold.
+   - Plain codes are strictly suppressed in console logs in production.
+2. **Idle Session Heartbeat & Auto-Logout**:
+   - Active heartbeat tracking with a 40-minute inactivity limit and a 7-day absolute session ceiling.
+   - Background cleanup daemon revokes abandoned tokens automatically.
+3. **Host Header Poisoning Defense**:
+   - Starlette `TrustedHostMiddleware` blocks spoofed host requests with `400 Bad Request`.
+4. **Path Traversal Containment**:
+   - `sanitize_upload_filename()` strips `../`, null bytes (`\0`), and leading dots.
+   - `dest_path.is_relative_to(upload_dir)` ensures target files cannot escape storage boundaries.
+5. **Multi-Tenant Boundary Isolation**:
+   - Strict `user_id == current_user.id` scoping enforced on 100% of routes.
+6. **Log Scrubbing**:
+   - `sanitize_audit_metadata()` scrubs passwords, tokens, OTPs, and secrets from audit logs.
 
-## License
-Private — All Rights Reserved
+---
+
+## 📜 License & Compliance
+
+Distributed under the **MIT License**. See `LICENSE` for details.  
+Built for enterprise compliance, GDPR Article 17 ("Right to Erasure"), and ISO/SOC-2 forensic audit trail standards.

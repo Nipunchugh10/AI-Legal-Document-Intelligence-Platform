@@ -336,9 +336,64 @@ export const Login: React.FC = () => {
   };
 
   const fillDemoCredentials = () => {
-    setValue("email", "lawyer@example.com");
-    setValue("password", "SecurePassword123!");
+    setValue("email", "demo@legalai.com");
+    setValue("password", "DemoPassword2026!");
     setErrorMsg(null);
+  };
+
+  const handleTryDemo = async () => {
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    setShowExpiredAlert(false);
+
+    setValue("email", "demo@legalai.com");
+    setValue("password", "DemoPassword2026!");
+
+    try {
+      const response = await api.post("/auth/login", {
+        email: "demo@legalai.com",
+        password: "DemoPassword2026!",
+      });
+
+      const { access_token, refresh_token, requires_2fa, pending_2fa_token, message } =
+        response.data;
+
+      if (requires_2fa) {
+        setPendingToken(pending_2fa_token);
+        setMaskedMessage(message || "Enter verification code.");
+        setRequires2fa(true);
+        return;
+      }
+
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("refresh_token", refresh_token);
+
+      const userResponse = await api.get<User>("/auth/me");
+      const user = userResponse.data;
+
+      login(access_token, refresh_token, user);
+      navigate(fromPath, { replace: true });
+    } catch (err: any) {
+      try {
+        const altResponse = await api.post("/auth/login", {
+          email: "lawyer@example.com",
+          password: "SecurePassword123!",
+        });
+        const { access_token, refresh_token } = altResponse.data;
+        localStorage.setItem("access_token", access_token);
+        localStorage.setItem("refresh_token", refresh_token);
+        const userRes = await api.get<User>("/auth/me");
+        login(access_token, refresh_token, userRes.data);
+        navigate(fromPath, { replace: true });
+        return;
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setErrorMsg("Failed to connect to demo account. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Render 2FA verification panel
@@ -584,10 +639,29 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
+          {/* Dedicated Try Demo Button */}
+          <button
+            type="button"
+            onClick={handleTryDemo}
+            disabled={isSubmitting}
+            className="btn w-full mt-3 flex items-center justify-center gap-2"
+            style={{
+              background: "linear-gradient(135deg, rgba(92, 98, 236, 0.12) 0%, rgba(139, 92, 246, 0.16) 100%)",
+              border: "1px solid rgba(92, 98, 236, 0.35)",
+              color: "var(--color-primary, #6366f1)",
+              fontWeight: "600",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            <span>⚡ Try Demo (1-Click Instant Access)</span>
+          </button>
+
           {/* Quick Demo Credentials Pill */}
           <div className="auth-demo-pill" onClick={fillDemoCredentials} title="Click to fill test credentials">
             <span>
-              💡 <strong>Demo Login:</strong> lawyer@example.com
+              💡 <strong>Demo User:</strong> demo@legalai.com
             </span>
             <span style={{ color: "var(--color-primary)", fontWeight: "600" }}>Auto-Fill</span>
           </div>
