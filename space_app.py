@@ -12,6 +12,9 @@ import os
 import sys
 from pathlib import Path
 
+# Ensure Gradio SSR mode is disabled to prevent Node.js from binding port 7860
+os.environ["GRADIO_SSR_MODE"] = "False"
+
 # Add backend directory to Python search path
 _ROOT_DIR = Path(__file__).resolve().parent
 _BACKEND_DIR = _ROOT_DIR / "backend"
@@ -53,15 +56,22 @@ import gradio as gr
 try:
     import spaces
 except ImportError:
-    class _MockSpaces:
-        def GPU(self, func=None, **kwargs):
-            if func is None:
-                return lambda f: f
-            return func
-    spaces = _MockSpaces()
+    class spaces:
+        @staticmethod
+        def GPU(*args, **kwargs):
+            if len(args) == 1 and callable(args[0]):
+                return args[0]
+            def decorator(func):
+                return func
+            return decorator
+
+@spaces.GPU(duration=60)
+def dummy_gpu():
+    """ZeroGPU startup probe function to verify dynamic GPU allocation."""
+    return None
 
 # Build companion Gradio Quick-Analysis Workspace
-@spaces.GPU
+@spaces.GPU(duration=120)
 def analyze_clause_quick(clause_text: str, analysis_type: str) -> str:
     """Quick LLM-powered clause analyzer for the Gradio interface."""
     if not clause_text or not clause_text.strip():
@@ -124,16 +134,45 @@ with gr.Blocks(title="AI Legal Document Intelligence Platform") as demo:
         "- **Database Diagnostics**: Visit [`/health/db`](/health/db) to view cloud database health."
     )
 
-# Mount Gradio onto the FastAPI application at /gradio
-# This preserves all FastAPI routes and the React SPA at / while adding Gradio at /gradio
-app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio")
+def trigger_zerogpu_startup():
+    """Explicitly dispatch startup report to ZeroGPU API daemon on Hugging Face Spaces."""
+    if os.getenv("SPACES_ZERO_GPU") == "1":
+        print("[*] ZeroGPU environment detected. Registering @spaces.GPU functions with host daemon...")
+        try:
+            import spaces.zero as spaces_zero
+            if hasattr(spaces_zero, "startup"):
+                spaces_zero.startup()
+                print("[+] ZeroGPU startup report dispatched successfully via spaces_zero.startup()!")
+            else:
+                from spaces.zero import client
+                client.startup_report()
+                print("[+] ZeroGPU startup report dispatched successfully via client.startup_report()!")
+        except Exception as e:
+            print(f"[!] ZeroGPU startup report dispatch notice: {e}")
 
-# Ensure Gradio mount precedes the React SPA catch-all route in the route table
+from starlette.responses import RedirectResponse
+
+# Mount Gradio onto the FastAPI application at /gradio
+# ssr_mode=False prevents Gradio from spawning a separate Node.js server that conflicts with port 7860
+app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio", ssr_mode=False)
+
+# Add redirect for /gradio (without trailing slash) to /gradio/
+@app.get("/gradio", include_in_schema=False)
+async def redirect_to_gradio():
+    return RedirectResponse(url="/gradio/", status_code=307)
+
+# Ensure Gradio mount and redirect precede the React SPA catch-all route in the route table
+gradio_redirect = app.routes.pop()
 gradio_mount = app.routes.pop()
 app.routes.insert(0, gradio_mount)
+app.routes.insert(0, gradio_redirect)
+
+# Pre-register GPU functions with ZeroGPU host daemon
+trigger_zerogpu_startup()
 
 if __name__ == "__main__":
     run_startup_migrations()
+    trigger_zerogpu_startup()
     import uvicorn
     port = int(os.getenv("PORT", 7860))
     print(f"[*] Starting unified server on http://0.0.0.0:{port}")
