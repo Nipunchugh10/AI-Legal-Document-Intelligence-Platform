@@ -28,7 +28,20 @@ from app.models.contract import Contract
 from app.models.analysis import Analysis
 from app.models.conversation import Conversation, ConversationMessage
 from app.models.audit_log import AuditLog
-from scripts.seed_demo import seed_demo_data, CONTRACT_TEXTS, build_contract_data
+try:
+    from scripts.seed_demo import seed_demo_data, CONTRACT_TEXTS, build_contract_data
+except ImportError:
+    import importlib.util
+    seed_path = ROOT_DIR / "scripts" / "seed_demo.py"
+    if not seed_path.exists():
+        seed_path = Path(__file__).resolve().parents[1] / "scripts" / "seed_demo.py"
+    spec = importlib.util.spec_from_file_location("scripts.seed_demo", str(seed_path))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["scripts.seed_demo"] = module
+    spec.loader.exec_module(module)
+    seed_demo_data = module.seed_demo_data
+    CONTRACT_TEXTS = module.CONTRACT_TEXTS
+    build_contract_data = module.build_contract_data
 
 
 class TestDay61DemoSeeding:
