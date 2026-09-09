@@ -12,19 +12,44 @@ logger = logging.getLogger(__name__)
 CLAUSE_SYSTEM_PROMPT = """You are an expert AI Legal Clause Extractor.
 Your task is to analyze the provided contract text and extract specific legal clauses.
 The target clause types to identify are:
-1. "payment_terms" (payment schedules, invoice details, late payment fees)
-2. "termination_clauses" (conditions for ending the contract, notice periods)
-3. "liability_clauses" (limitations of liability, damage caps, exclusions)
-4. "confidentiality_clauses" (non-disclosure terms, definition of confidential information)
-5. "intellectual_property_clauses" (ownership of work product, licensing, copyrights/patents)
-6. "dispute_resolution_clauses" (arbitration, mediation, court location for disputes)
-7. "governing_law_clauses" (applicable state/country law governing the contract)
-8. "renewal_clauses" (auto-renewal, term extensions, notice for renewal)
-9. "indemnification_clauses" (obligations to indemnify, defend, or hold harmless)
+1. "payment_terms" (payment schedules, invoice details, fee milestones, late payment interest, reimbursement, tax terms; often found under "Fees", "Compensation", "Consideration", "Billing", or "Schedule A")
+2. "termination_clauses" (conditions for ending the contract, notice periods, cure windows, termination for cause/convenience; often under "Term & Expiry", "Default", "Remedies", "Cancellation")
+3. "liability_clauses" (limitations of liability, damage caps, consequential/indirect damage waivers, exclusions to caps; often under "Limitation of Damages", "Risk Allocation")
+4. "confidentiality_clauses" (non-disclosure obligations, definition of confidential information, standard 4 carve-outs, return/destruction; often under "Non-Disclosure", "Proprietary Data")
+5. "intellectual_property_clauses" (ownership of work product, IP assignment, licensing, moral rights waivers, pre-existing IP reservations; often under "Work Made for Hire", "Proprietary Rights")
+6. "dispute_resolution_clauses" (arbitration seat/venue, mediation, escalation to executives, exclusive court jurisdiction; often under "Disputes", "Arbitration", "Governing Law & Forum")
+7. "governing_law_clauses" (applicable state/country law governing the contract interpretation; often under "Applicable Law", "Jurisdiction", "Miscellaneous")
+8. "renewal_clauses" (initial term length, automatic evergreen renewal, notice window to cancel renewal, fee escalations on renewal; often under "Term", "Duration", "Extension")
+9. "indemnification_clauses" (obligations to indemnify, defend, or hold harmless, scope of indemnified claims, third-party claim defense; often under "Indemnity", "Defense of Claims")
 
-For each target clause type:
-- If the clause is present, extract the exact text of the clause as it appears in the contract, and specify its approximate location in the text (beginning, middle, or end).
+EXTRACTION & BOUNDARY RULES:
+- If the clause is present, extract the COMPLETE and EXACT text of the clause as it appears in the contract, including any carve-outs, qualifications, or sub-clauses. Specify its approximate location ("beginning", "middle", or "end").
+- Non-standard headings: Do not rely solely on exact section titles. A termination provision inside a section titled "Section 9: Term and Default" must be extracted as "termination_clauses". Payment schedules in "Exhibit B" must be extracted as "payment_terms".
 - If the clause is NOT present in the contract, set "present" to false, and "text" and "location" to "Not mentioned".
+
+FEW-SHOT EXAMPLES:
+
+Example 1 (Termination Clause buried in "Term and Default"):
+Text:
+"Section 8. Term and Default. This Agreement shall commence on the Effective Date and remain in effect for two (2) years. Either party may terminate this Agreement immediately upon written notice if the other party breaches any material term and fails to cure such breach within thirty (30) days of receiving written notice thereof. In addition, Customer may terminate for convenience upon sixty (60) days prior written notice."
+Output clause item:
+{
+  "clause_type": "termination_clauses",
+  "present": true,
+  "text": "Section 8. Term and Default. This Agreement shall commence on the Effective Date and remain in effect for two (2) years. Either party may terminate this Agreement immediately upon written notice if the other party breaches any material term and fails to cure such breach within thirty (30) days of receiving written notice thereof. In addition, Customer may terminate for convenience upon sixty (60) days prior written notice.",
+  "location": "middle"
+}
+
+Example 2 (Milestone-based Payment Terms in "Fees & Invoicing"):
+Text:
+"Section 4. Fees and Payment. Client shall pay Contractor $15,000 in three equal milestones: 33% upon signing, 33% upon beta delivery, and 34% upon final acceptance. Invoices are payable net-30 days from receipt. Overdue balances shall accrue interest at 1.5% per month."
+Output clause item:
+{
+  "clause_type": "payment_terms",
+  "present": true,
+  "text": "Section 4. Fees and Payment. Client shall pay Contractor $15,000 in three equal milestones: 33% upon signing, 33% upon beta delivery, and 34% upon final acceptance. Invoices are payable net-30 days from receipt. Overdue balances shall accrue interest at 1.5% per month.",
+  "location": "beginning"
+}
 
 Return ONLY a valid, clean JSON object with a single key "clauses" containing a list of clause objects. Each clause object must have the following keys:
 - "clause_type": the type of clause (must be exactly one of the nine listed above)
@@ -43,19 +68,45 @@ def _clean_and_parse_json(text: str) -> Dict[str, Any]:
         cleaned = re.sub(r"\n?```$", "", cleaned)
         cleaned = cleaned.strip()
 
+    cleaned_fixed = re.sub(r",\s*([\]}])", r"\1", cleaned)
+
     try:
-        return json.loads(cleaned)
+        data = json.loads(cleaned_fixed)
+        if isinstance(data, list):
+            return {"clauses": data}
+        if isinstance(data, dict):
+            if "clauses" in data:
+                return data
+            if "clause_type" in data:
+                return {"clauses": [data]}
+            return data
+        return {"clauses": []}
     except json.JSONDecodeError:
-        # Fallback: search for JSON object with regex
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if match:
+        # Fallback 1: search for JSON array if model returned a bare list
+        array_match = re.search(r"\[.*\]", cleaned_fixed, re.DOTALL)
+        if array_match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(array_match.group(0))
+                if isinstance(data, list):
+                    return {"clauses": data}
             except json.JSONDecodeError:
                 pass
-        
+
+        # Fallback 2: search for outermost JSON object with regex
+        match = re.search(r"\{.*\}", cleaned_fixed, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    if "clauses" in data:
+                        return data
+                    if "clause_type" in data:
+                        return {"clauses": [data]}
+                    return data
+            except json.JSONDecodeError:
+                pass
+
         logger.error(f"Failed to parse JSON from LLM response for clauses: {text[:200]}")
-        # Return fallback structured response
         return {
             "clauses": []
         }

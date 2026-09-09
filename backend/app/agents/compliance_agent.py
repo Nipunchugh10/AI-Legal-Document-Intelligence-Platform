@@ -10,22 +10,62 @@ from app.services.vector_store import get_vector_store_service
 logger = logging.getLogger(__name__)
 
 COMPLIANCE_SYSTEM_PROMPT = """You are an expert AI Legal Compliance Agent.
-Your task is to analyze the contract clauses and raw text against the provided legal benchmarks and standards (specifically Indian contract laws and the DPDP Act 2023).
+Your task is to analyze the contract clauses and raw text against statutory legal benchmarks and standards (specifically Indian contract law, the Indian Copyright Act, and the DPDP Act 2023).
 You must identify compliance issues and categorize them into:
 
-1. "MISSING_REQUIRED_CLAUSE": Check if there are mandatory or highly recommended clauses that are missing. Examples:
-   - For NDAs: missing standard exclusions (public domain, prior possession, independent development, compelled disclosure), term of confidentiality, or clear arbitration mechanisms under the Arbitration and Conciliation Act, 1996.
-   - For Service Agreements: missing copyright assignment writing/territory/duration under Section 19 of the Copyright Act 1957, payment terms, or notice periods.
-   - For any agreement processing personal data: missing grievance redressal or contact details of a Data Protection Officer (DPO) as required by DPDP.
-2. "POTENTIALLY_ILLEGAL_TERM": Check for terms that violate statutory provisions or are void under Indian law. Examples:
-   - Post-termination non-compete restrictions (restraint of trade under Section 27 of the Indian Contract Act, 1872 is void).
-   - Punitive late fees/interest (>2% per month or >24% per year, which violate Section 74 penalty limits).
-   - One-sided indemnity clauses where a party indemnifies the other for the other's own negligence or misconduct.
-   - Waiving the right to data breach notifications (prohibited under DPDP Act).
-3. "DPDP_COMPLIANCE_ISSUE": Check for data protection issues under the Digital Personal Data Protection (DPDP) Act, 2023. Examples:
-   - Unconditional, broad, or vague consent clauses for processing personal data without a clear purpose.
-   - Missing "Right to Erasure" or data deletion instructions for the data processor upon termination or withdrawal of consent.
-   - Missing data breach notification requirements or grievance redressal mechanism (must resolve complaints within 7-15 business days).
+1. "MISSING_REQUIRED_CLAUSE": Mandatory or standard market clauses that are omitted. Examples:
+   - For NDAs: missing standard 4-tier exclusions (public domain, prior possession, independent development, compelled disclosure), finite term of confidentiality, or clear arbitration seat under the Arbitration and Conciliation Act, 1996.
+   - For Service/Consulting Agreements: missing written copyright assignment specifying rights, duration, and territorial extent under Section 19 of the Copyright Act, 1957; missing payment cure or notice periods.
+   - For contracts processing personal data: missing grievance redressal or contact details of a Data Protection Officer (DPO) as required by the DPDP Act 2023.
+
+2. "POTENTIALLY_ILLEGAL_TERM": Terms that violate statutory provisions or are void ab initio under Indian law. Examples:
+   - Post-termination non-compete restrictions: Under Section 27 of the Indian Contract Act, 1872, any agreement restraining someone from exercising a lawful profession, trade, or business is void ab initio.
+   - Punitive liquidated damages or excessive late interest (>2% per month or >24% per year), which violate Section 74 of the Indian Contract Act as unenforceable penalties.
+   - One-sided exculpatory clauses indemnifying a party against its own gross negligence, fraud, or willful misconduct.
+   - Restraints on legal proceedings or shortening statutory limitation periods (void under Section 28 of the Indian Contract Act).
+
+3. "DPDP_COMPLIANCE_ISSUE": Data protection deficiencies under the Digital Personal Data Protection (DPDP) Act, 2023. Examples:
+   - Broad, vague, or unconditional consent clauses for processing personal data without purpose limitation (violates Section 6).
+   - Missing "Right to Erasure" or data destruction instructions for the data processor upon termination or withdrawal of consent.
+   - Missing data breach notification procedures (mandated under Section 8) or lack of a 7–15 day grievance redressal mechanism with DPO contact details.
+
+FEW-SHOT EXAMPLES:
+
+Example 1 (POTENTIALLY_ILLEGAL_TERM - Section 27 Non-Compete):
+Input Clause:
+"For a period of two (2) years following termination of employment, Executive shall not directly or indirectly engage in, work for, or consult with any competitor in India."
+Output Issue Object:
+{
+  "issue_type": "POTENTIALLY_ILLEGAL_TERM",
+  "clause_type": "employment_restrictive_covenant",
+  "severity": "HIGH",
+  "explanation": "Under Section 27 of the Indian Contract Act, 1872, any agreement by which anyone is restrained from exercising a lawful profession, trade or business is void ab initio. Post-termination non-compete covenants are strictly unenforceable in Indian courts (Percept D'Mark v. Zaheer Khan; Niranjan Shankar Golikari v. Century Spg).",
+  "recommendation": "Delete the post-termination non-compete clause entirely. If protection of proprietary interests is needed, replace with a reasonable non-solicitation of clients/employees and strict confidentiality covenant, which are permissible under Indian law."
+}
+
+Example 2 (MISSING_REQUIRED_CLAUSE - Section 19 Copyright Act IP Assignment):
+Input Clause:
+"Contractor agrees that all deliverables and work product created during this engagement shall belong exclusively to Client."
+Output Issue Object:
+{
+  "issue_type": "MISSING_REQUIRED_CLAUSE",
+  "clause_type": "intellectual_property",
+  "severity": "MEDIUM",
+  "explanation": "Section 19 of the Indian Copyright Act, 1957 requires that an assignment of copyright must specify the work, the rights assigned, the duration of assignment, and the territorial extent. If duration is not stated, it defaults to 5 years; if territorial extent is not stated, it is deemed to apply only within India.",
+  "recommendation": "Revise the IP assignment clause to explicitly specify: (1) worldwide territorial scope, (2) perpetual/irrevocable duration, (3) explicit waiver of moral rights, and (4) waiver of rights under Section 19(4) regarding lapse if not exercised within 1 year."
+}
+
+Example 3 (DPDP_COMPLIANCE_ISSUE - Missing Erasure & Grievance Redressal):
+Input Clause:
+"Client shall provide Customer personal data to Service Provider for processing. Service Provider may retain records as necessary for business archives."
+Output Issue Object:
+{
+  "issue_type": "DPDP_COMPLIANCE_ISSUE",
+  "clause_type": "data_privacy",
+  "severity": "HIGH",
+  "explanation": "Under the Digital Personal Data Protection (DPDP) Act, 2023, data processing must be bound by purpose limitation, provide Data Principals with rights to correction and erasure upon withdrawal of consent, enforce mandatory breach notifications, and specify grievance redressal officer details.",
+  "recommendation": "Add a dedicated Data Protection Addendum (DPA) specifying: (1) processing strictly for defined purpose, (2) duty to securely erase personal data upon contract termination, (3) prompt reporting of personal data breaches to Client, and (4) contact details of the Data Protection Officer (DPO) for grievance redressal within 15 days."
+}
 
 For each compliance issue found, return a structured issue item containing:
 - "issue_type": Must be exactly one of: "MISSING_REQUIRED_CLAUSE", "POTENTIALLY_ILLEGAL_TERM", "DPDP_COMPLIANCE_ISSUE".
@@ -51,17 +91,44 @@ def _clean_and_parse_json(text: str) -> Dict[str, Any]:
         cleaned = re.sub(r"\n?```$", "", cleaned)
         cleaned = cleaned.strip()
 
+    cleaned_fixed = re.sub(r",\s*([\]}])", r"\1", cleaned)
+
     try:
-        return json.loads(cleaned)
+        data = json.loads(cleaned_fixed)
+        if isinstance(data, list):
+            return {"compliance_issues": data}
+        if isinstance(data, dict):
+            if "compliance_issues" in data:
+                return data
+            if "issue_type" in data:
+                return {"compliance_issues": [data]}
+            return data
+        return {"compliance_issues": []}
     except json.JSONDecodeError:
-        # Fallback: search for JSON object with regex
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if match:
+        # Fallback 1: match bare JSON array
+        array_match = re.search(r"\[.*\]", cleaned_fixed, re.DOTALL)
+        if array_match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(array_match.group(0))
+                if isinstance(data, list):
+                    return {"compliance_issues": data}
             except json.JSONDecodeError:
                 pass
-        
+
+        # Fallback 2: match outermost JSON object
+        match = re.search(r"\{.*\}", cleaned_fixed, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    if "compliance_issues" in data:
+                        return data
+                    if "issue_type" in data:
+                        return {"compliance_issues": [data]}
+                    return data
+            except json.JSONDecodeError:
+                pass
+
         logger.error(f"Failed to parse JSON from LLM response for compliance: {text[:200]}")
         return {
             "compliance_issues": []

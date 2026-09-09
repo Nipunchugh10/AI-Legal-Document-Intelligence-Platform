@@ -12,13 +12,54 @@ RISK_SYSTEM_PROMPT = """You are an Elite Senior Attorney & Legal Risk Analysis A
 Your task is to analyze contract text using the IRAC (Issue, Rule, Application, Conclusion) legal reasoning framework and classify findings into a 3-Tier Traffic Light Flagging System:
 
 1. "RED_FLAG" (Critical / Fatal Exposure — DO NOT SIGN WITHOUT NEGOTIATING):
-   - Uncapped liabilities, broad indemnity carve-outs, illegal post-employment non-compete covenants (e.g. void under Section 27 Contract Act), one-sided termination forfeiture, automatic pre-existing IP surrenders, unilateral agreement modification, cross-default accelerations, defective title exposure.
+   - Uncapped liabilities, broad unilateral indemnities, illegal post-employment non-compete covenants (e.g. void under Section 27 Indian Contract Act), one-sided termination forfeiture, automatic pre-existing IP surrenders, unilateral agreement modification, cross-default accelerations, defective title exposure.
 
 2. "YELLOW_FLAG" (Small Concerns — VERIFY WITH LAWYER BEFORE SIGNING):
-   - Mild ambiguities, missing notice period details, unindexed rent escalations, vague force majeure or pandemic clauses, seat vs venue arbitration ambiguities, long notice periods (>90 days), subjective performance KPIs.
+   - Mild ambiguities, missing notice period details, unindexed rent escalations, vague force majeure clauses, seat vs venue arbitration ambiguities, long notice periods (>60 days), subjective performance KPIs.
 
 3. "GREEN_FLAG" (Protective & Standard Market Terms — NO ISSUE / FAVORABLE):
-   - Capped liability (e.g., 1x contract value), mutual indemnities, standard 4-tier confidentiality exclusions, clear 30-day exit notices, statutory compliance guarantees, balanced IP carve-outs.
+   - Capped liability (e.g., 1x annual contract value), mutual indemnities, standard 4-tier confidentiality exclusions, clear 30-day exit notices, statutory compliance guarantees, balanced IP carve-outs.
+
+FEW-SHOT EXAMPLES:
+
+Example 1 (RED_FLAG - Unlimited Liability & Unilateral Indemnity):
+Input Clause:
+"Service Provider shall indemnify, defend, and hold harmless Client against any and all claims, losses, and damages without limitation. In no event shall Client be liable for any indirect, consequential, or punitive damages."
+Output Risk Object:
+{
+  "flag_category": "RED_FLAG",
+  "risk_type": "UNLIMITED_LIABILITY",
+  "severity": "HIGH",
+  "clause_text": "Service Provider shall indemnify, defend, and hold harmless Client against any and all claims, losses, and damages without limitation. In no event shall Client be liable for any indirect, consequential, or punitive damages.",
+  "explanation": "IRAC Analysis - Issue: Uncapped unilateral liability and one-sided waiver of consequential damages. Rule: Commercial contracts should maintain mutual liability caps and reciprocal consequential damage waivers. Application: Service Provider faces unlimited financial catastrophe for third-party claims while Client caps its own exposure completely. Conclusion: Highly dangerous asymmetrical risk allocation.",
+  "suggestion": "Replace with: 'Each party's maximum aggregate liability under this Agreement shall be capped at the total fees paid or payable by Client in the twelve (12) months preceding the claim. Neither party shall be liable for indirect, incidental, or consequential damages, and indemnification obligations shall be mutual.'"
+}
+
+Example 2 (YELLOW_FLAG - Extended Notice Period & Lack of Convenience Termination):
+Input Clause:
+"Contractor may only terminate this Agreement upon ninety (90) days prior written notice, and only in the event of Client's uncured material breach. Client may terminate at any time."
+Output Risk Object:
+{
+  "flag_category": "YELLOW_FLAG",
+  "risk_type": "ONE_SIDED_TERMINATION",
+  "severity": "MEDIUM",
+  "clause_text": "Contractor may only terminate this Agreement upon ninety (90) days prior written notice, and only in the event of Client's uncured material breach. Client may terminate at any time.",
+  "explanation": "IRAC Analysis - Issue: Disproportionately long 90-day notice and lack of mutual termination for convenience. Rule: Standard consulting contracts provide 30-day mutual termination for convenience. Application: Contractor is locked in for three months with no exit right even if project conditions deteriorate. Conclusion: Medium commercial impediment requiring negotiation.",
+  "suggestion": "Negotiate: 'Either party may terminate this Agreement for convenience upon thirty (30) days prior written notice, provided that Client pays Contractor for all work completed up to the termination effective date.'"
+}
+
+Example 3 (GREEN_FLAG - Protective Standard Confidentiality):
+Input Clause:
+"Confidential Information does not include information that: (a) is or becomes publicly known through no breach; (b) was already in recipient's rightful possession; (c) is independently developed without reference to the disclosing party's information; or (d) is required to be disclosed by law or court order."
+Output Risk Object:
+{
+  "flag_category": "GREEN_FLAG",
+  "risk_type": "PROTECTIVE_STANDARD",
+  "severity": "LOW",
+  "clause_text": "Confidential Information does not include information that: (a) is or becomes publicly known through no breach; (b) was already in recipient's rightful possession; (c) is independently developed without reference to the disclosing party's information; or (d) is required to be disclosed by law or court order.",
+  "explanation": "IRAC Analysis - Issue: Scope of non-disclosure exceptions. Rule: Industry-standard 4-tier carve-out protects recipient from undue liability. Application: Clearly excludes public, pre-existing, independently developed, and legally mandated disclosures. Conclusion: Balanced, highly protective standard market terms.",
+  "suggestion": "Clause conforms to best practice legal standards. No revision required."
+}
 
 For each item evaluated, return a structured object with:
 - "flag_category": Exactly one of "RED_FLAG", "YELLOW_FLAG", or "GREEN_FLAG".
@@ -40,16 +81,44 @@ def _clean_and_parse_json(text: str) -> Dict[str, Any]:
         cleaned = re.sub(r"\n?```$", "", cleaned)
         cleaned = cleaned.strip()
 
+    cleaned_fixed = re.sub(r",\s*([\]}])", r"\1", cleaned)
+
     try:
-        return json.loads(cleaned)
+        data = json.loads(cleaned_fixed)
+        if isinstance(data, list):
+            return {"risks": data}
+        if isinstance(data, dict):
+            if "risks" in data:
+                return data
+            if "flag_category" in data or "risk_type" in data:
+                return {"risks": [data]}
+            return data
+        return {"risks": []}
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if match:
+        # Fallback 1: match array
+        array_match = re.search(r"\[.*\]", cleaned_fixed, re.DOTALL)
+        if array_match:
             try:
-                return json.loads(match.group(0))
+                data = json.loads(array_match.group(0))
+                if isinstance(data, list):
+                    return {"risks": data}
             except json.JSONDecodeError:
                 pass
-        
+
+        # Fallback 2: match outermost JSON object
+        match = re.search(r"\{.*\}", cleaned_fixed, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if isinstance(data, dict):
+                    if "risks" in data:
+                        return data
+                    if "flag_category" in data or "risk_type" in data:
+                        return {"risks": [data]}
+                    return data
+            except json.JSONDecodeError:
+                pass
+
         logger.error(f"Failed to parse JSON from LLM response for risks: {text[:200]}")
         return {
             "risks": []

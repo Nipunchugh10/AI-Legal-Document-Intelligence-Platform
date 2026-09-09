@@ -94,10 +94,20 @@ def generate_summary_node(state: ContractAnalysisState) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Error in generate_summary_node for contract {contract_id}: {str(e)}")
+        fallback_summary = (
+            f"### Executive Summary\n"
+            f"Contract analysis completed for **{doc_type}** between **{metadata.get('party_a', 'Party A')}** and **{metadata.get('party_b', 'Party B')}**.\n\n"
+            f"### Key Highlights\n"
+            f"- **Extracted Clauses**: {len(clauses) if isinstance(clauses, dict) else 0} clause categories evaluated.\n"
+            f"- **Risks Flagged**: {len(risks)} potential risk items identified.\n"
+            f"- **Compliance Issues**: {len(compliance)} compliance findings noted.\n\n"
+            f"### Actionable Next Steps\n"
+            f"Review flagged risks and compliance issues in detail before executing this agreement."
+        )
         return {
-            "summary": "Failed to generate executive summary report.",
+            "summary": fallback_summary,
             "error": str(e),
-            "messages": state.get("messages", []) + [{"role": "system", "content": f"Summary generation node error: {str(e)}"}]
+            "messages": state.get("messages", []) + [{"role": "system", "content": f"Summary generation fallback applied: {str(e)}"}]
         }
 
 def error_node(state: ContractAnalysisState) -> Dict[str, Any]:
@@ -118,9 +128,80 @@ def check_text_exists(state: ContractAnalysisState) -> str:
         return "error_node"
     return "parse_document"
 
+def check_parsing_output(state: ContractAnalysisState) -> str:
+    """
+    Conditional routing function: verifies parsing output integrity.
+    If raw_text is missing or blank, routes to error_node.
+    Otherwise routes to extract_clauses.
+    """
+    raw_text = state.get("raw_text", "")
+    if not raw_text or not raw_text.strip():
+        return "error_node"
+    return "extract_clauses"
+
+def check_analysis_integrity(state: ContractAnalysisState) -> str:
+    """
+    Conditional routing function: checks whether upstream agent outputs
+    (metadata, clauses, risks, compliance_issues) are well-formed data structures.
+    If any structure is malformed or corrupted, routes to recover_state.
+    Otherwise routes directly to generate_summary.
+    """
+    metadata = state.get("metadata")
+    clauses = state.get("clauses")
+    risks = state.get("risks")
+    compliance = state.get("compliance_issues")
+
+    if (
+        not isinstance(metadata, dict)
+        or not isinstance(clauses, dict)
+        or not isinstance(risks, list)
+        or not isinstance(compliance, list)
+    ):
+        return "recover_state"
+    return "generate_summary"
+
+def recover_state_node(state: ContractAnalysisState) -> Dict[str, Any]:
+    """
+    LangGraph state recovery node: repairs malformed or corrupt agent state outputs
+    to ensure downstream summary synthesis never fails.
+    """
+    logger.warning(f"recover_state_node triggered for contract {state.get('contract_id', 0)}: repairing malformed state.")
+    
+    repaired_metadata = state.get("metadata")
+    if not isinstance(repaired_metadata, dict):
+        repaired_metadata = {
+            "party_a": "Not mentioned",
+            "party_b": "Not mentioned",
+            "effective_date": "Not mentioned",
+            "jurisdiction": "Not mentioned",
+        }
+        
+    repaired_clauses = state.get("clauses")
+    if not isinstance(repaired_clauses, dict):
+        repaired_clauses = {}
+        
+    repaired_risks = state.get("risks")
+    if not isinstance(repaired_risks, list):
+        repaired_risks = []
+        
+    repaired_compliance = state.get("compliance_issues")
+    if not isinstance(repaired_compliance, list):
+        repaired_compliance = []
+        
+    return {
+        "metadata": repaired_metadata,
+        "clauses": repaired_clauses,
+        "risks": repaired_risks,
+        "compliance_issues": repaired_compliance,
+        "messages": state.get("messages", []) + [
+            {"role": "system", "content": "LangGraph state recovery node sanitized agent outputs."}
+        ]
+    }
+
 def build_analysis_workflow():
     """
-    Constructs and compiles the full contract analysis orchestrator LangGraph.
+    Constructs and compiles the full contract analysis orchestrator LangGraph
+    with conditional edges for validation and error recovery.
     """
     builder = StateGraph(ContractAnalysisState)
     
@@ -130,10 +211,11 @@ def build_analysis_workflow():
     builder.add_node("extract_risks", extract_risks_node)
     builder.add_node("negotiation_advisor", negotiation_advisor_node)
     builder.add_node("check_compliance", check_compliance_node)
+    builder.add_node("recover_state", recover_state_node)
     builder.add_node("generate_summary", generate_summary_node)
     builder.add_node("error_node", error_node)
     
-    # Add conditional edge from START
+    # Conditional edge from START
     builder.add_conditional_edges(
         START,
         check_text_exists,
@@ -143,14 +225,34 @@ def build_analysis_workflow():
         }
     )
     
-    # Add sequential edges
-    builder.add_edge("parse_document", "extract_clauses")
+    # Conditional edge after parsing
+    builder.add_conditional_edges(
+        "parse_document",
+        check_parsing_output,
+        {
+            "error_node": "error_node",
+            "extract_clauses": "extract_clauses"
+        }
+    )
+    
+    # Sequential edges
     builder.add_edge("extract_clauses", "extract_risks")
     builder.add_edge("extract_risks", "negotiation_advisor")
     builder.add_edge("negotiation_advisor", "check_compliance")
-    builder.add_edge("check_compliance", "generate_summary")
     
-    # Add terminal edges
+    # Conditional edge before summary to guarantee state integrity
+    builder.add_conditional_edges(
+        "check_compliance",
+        check_analysis_integrity,
+        {
+            "recover_state": "recover_state",
+            "generate_summary": "generate_summary"
+        }
+    )
+    
+    builder.add_edge("recover_state", "generate_summary")
+    
+    # Terminal edges
     builder.add_edge("generate_summary", END)
     builder.add_edge("error_node", END)
     
