@@ -3,15 +3,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-dist/
+# Anchor to repo root only. An unanchored `dist/` also matches `frontend/dist`,
+# and Hugging Face Spaces filters .gitignore'd paths out of the running
+# filesystem (honoring the match but NOT the `!frontend/dist` negations), which
+# stripped the compiled React SPA from the live Space. `/dist/` cannot match
+# `frontend/dist`, so the committed SPA is served in production.
+/dist/
 build/
 *.egg
-!frontend/dist/
-!frontend/dist/index.html
-!frontend/dist/favicon.svg
-!frontend/dist/icons.svg
-!frontend/dist/assets/
-!frontend/dist/assets/**
 venv/
 .venv/
 venv_linux/
