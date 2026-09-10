@@ -185,14 +185,14 @@
   background: rgba(0, 0, 0, 0.15);
 }
 
-.user-profile-widget {
+.user-profile-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.user-avatar {
+.user-avatar-circle {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -206,13 +206,16 @@
   flex-shrink: 0;
 }
 
-.user-meta-details {
+.user-text-info {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.user-meta-email {
+.user-email-display {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text-main);
@@ -221,7 +224,7 @@
   text-overflow: ellipsis;
 }
 
-.user-badge-2fa {
+.user-role-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -230,7 +233,7 @@
   font-weight: 500;
 }
 
-.btn-logout-compact {
+.btn-logout-sidebar {
   background: none;
   border: none;
   color: var(--color-text-dark);
@@ -243,17 +246,17 @@
   transition: var(--transition-fast);
 }
 
-.btn-logout-compact:hover {
+.btn-logout-sidebar:hover {
   color: var(--color-danger);
   background: var(--color-danger-bg);
 }
 
-.sidebar.collapsed .user-meta-details,
-.sidebar.collapsed .btn-logout-compact {
+.sidebar.collapsed .user-text-info,
+.sidebar.collapsed .btn-logout-sidebar {
   display: none;
 }
 
-.sidebar.collapsed .user-profile-widget {
+.sidebar.collapsed .user-profile-summary {
   justify-content: center;
 }
 

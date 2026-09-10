@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import { fetchConversations, type ConversationItem } from "../services/historyService";
 import { ErrorScreen } from "../components/ErrorScreen";
+import { Markdown } from "../components/Markdown";
 import { classifyError, type ClassifiedError } from "../services/errorUtils";
 import "./ContractDetailPage.css";
 
@@ -782,7 +783,7 @@ ${(analysisData.compliance_issues || [])
                   </div>
                   <div className="executive-summary-prose">
                     {analysisData?.summary ? (
-                      analysisData.summary
+                      <Markdown content={analysisData.summary} />
                     ) : (contract.status === "processing" || isAnalyzing) ? (
                       <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", textAlign: "center" }}>
                         <div className="spinner" style={{ width: "36px", height: "36px" }} />

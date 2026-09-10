@@ -1208,3 +1208,29 @@ html { scroll-behavior: smooth; }
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); background-clip: content-box; }
+
+/* ==========================================================================
+   Markdown renderer (components/Markdown.tsx) — formatted AI prose.
+   ========================================================================== */
+.md-root { color: var(--color-text-main); font-size: 0.92rem; line-height: 1.65; white-space: normal; }
+.md-root > *:first-child { margin-top: 0; }
+.md-root > *:last-child { margin-bottom: 0; }
+.md-h1 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; margin: 20px 0 10px; color: var(--color-text-main); }
+.md-h2 { font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; margin: 18px 0 8px; color: var(--color-text-main); }
+.md-h3 { font-size: 0.9rem; font-weight: 700; margin: 14px 0 6px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.md-p { margin: 0 0 12px; }
+.md-list { margin: 0 0 12px; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 6px; }
+.md-list li { line-height: 1.55; }
+ul.md-list { list-style: disc; }
+ol.md-list { list-style: decimal; }
+.md-list li::marker { color: var(--color-primary); }
+.md-root strong { color: var(--color-text-main); font-weight: 700; }
+.md-inline-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(92, 98, 236, 0.12);
+  color: var(--color-secondary);
+}
+.light-theme .md-inline-code { background: rgba(92, 98, 236, 0.1); }
