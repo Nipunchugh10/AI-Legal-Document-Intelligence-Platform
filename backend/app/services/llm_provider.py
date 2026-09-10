@@ -17,12 +17,16 @@ logger = logging.getLogger(__name__)
 
 _configured = False
 
-# Ordered fallback cascade utilizing separate Google AI Studio free quota buckets
+# Ordered fallback cascade utilizing separate Google AI Studio free quota buckets.
+# Lite models are listed first: they sit in higher-RPM quota buckets and, on the
+# current free-tier key, are the models that are actually served (the heavier
+# `*-flash` buckets are frequently exhausted and return 429). Keeping the heavier
+# flash models as deep fallbacks preserves resilience if the lite buckets fill up.
 GEMINI_CASCADE_MODELS = [
-    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
     "gemini-2.5-flash",
 ]
 

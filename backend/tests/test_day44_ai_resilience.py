@@ -140,9 +140,19 @@ def test_gemini_multi_model_fallback_cascade():
             mock_instance.generate_content.side_effect = Exception("429 ResourceExhausted: 15 RPM Rate Limit exceeded on model " + model_name)
         return mock_instance
 
-    with patch("google.generativeai.GenerativeModel", side_effect=mock_generative_model):
-        result = _generate_with_model_cascade("Analyze standard termination clause")
-        assert "Gemini 2.5 Flash Lite" in result
+    # Force a NON-lite primary model so the mock rate-limits it and the cascade must
+    # fail over to a lite fallback. (The app's default primary is now itself a lite
+    # model, so this test pins the primary explicitly rather than relying on the default.)
+    from app.core.config import get_settings as _get_settings
+    _settings = _get_settings()
+    _original_model = _settings.GEMINI_MODEL
+    _settings.GEMINI_MODEL = "gemini-2.5-flash"
+    try:
+        with patch("google.generativeai.GenerativeModel", side_effect=mock_generative_model):
+            result = _generate_with_model_cascade("Analyze standard termination clause")
+            assert "Gemini 2.5 Flash Lite" in result
+    finally:
+        _settings.GEMINI_MODEL = _original_model
 
         # Verify telemetry recorded the rate limit on primary and success on fallback lite
         metrics = ai_usage_monitor.get_usage_metrics()

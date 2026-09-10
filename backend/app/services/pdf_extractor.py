@@ -32,15 +32,16 @@ SUPPORTED_EXTENSIONS = {
     ".docx", ".doc", ".txt", ".md", ".rtf"
 }
 
-# Ordered Gemini Vision cascade models utilizing separate Google AI Studio free-tier quota pools
+# Ordered Gemini Vision cascade models utilizing separate Google AI Studio free-tier quota pools.
+# Lite models lead: on the current free-tier key they are the buckets actually served,
+# while the heavier `*-flash` buckets frequently return 429. Heavier flash models remain
+# as deep fallbacks for OCR resilience if the lite buckets are exhausted.
 VISION_CASCADE_MODELS = [
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.6-flash",
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
     "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
 ]
 
 

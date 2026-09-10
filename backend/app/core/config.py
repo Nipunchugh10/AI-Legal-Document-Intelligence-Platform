@@ -214,7 +214,11 @@ class Settings(BaseSettings):
 
     # --- AI / LLM (100% Free Tier Google Gemini) ---
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Primary model tried first on every LLM/vision call. Defaults to a lite model
+    # (higher free-tier RPM bucket) because the heavier `gemini-2.5-flash` bucket is
+    # frequently quota-exhausted (429) on free-tier keys; leading with a healthy lite
+    # model avoids a wasted 429 round-trip on every agent call. Override per-deployment.
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
     AI_FREE_TIER_DAILY_LIMIT: int = 1500
     AI_WARNING_THRESHOLD_PERCENT: float = 80.0
 
