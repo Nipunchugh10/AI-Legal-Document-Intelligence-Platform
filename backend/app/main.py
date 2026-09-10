@@ -262,6 +262,13 @@ def _discover_frontend_dist() -> Optional[Path]:
     cwd = Path(os.getcwd()).resolve()
 
     candidates: list[Path] = [
+        # backend/webapp is a committed copy of the built SPA that lives INSIDE the
+        # backend tree. Hugging Face Spaces strips a top-level `frontend/dist`
+        # directory from the running filesystem (build systems commonly hardcode-
+        # ignore `dist`/`build` regardless of .gitignore), so we ship the SPA under
+        # a non-`dist` path that is guaranteed to be materialized alongside the app.
+        here.parents[1] / "webapp",              # <repo>/backend/webapp
+        cwd / "backend" / "webapp",
         here.parents[2] / "frontend" / "dist",   # <repo>/backend/app/main.py -> <repo>/frontend/dist
         here.parents[1] / "frontend" / "dist",   # defensive: alternate nesting
         here.parents[3] / "frontend" / "dist" if len(here.parents) > 3 else here.parents[2] / "frontend" / "dist",
