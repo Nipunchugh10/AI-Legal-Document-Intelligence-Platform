@@ -21,7 +21,7 @@ license: mit
 [![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-61dafb.svg?logo=react)](https://react.dev)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11+-3776ab.svg?logo=python)](https://python.org)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2015+-336791.svg?logo=postgresql)](https://www.postgresql.org)
-[![Tests Passing](https://img.shields.io/badge/Tests-365%2F365%20Passing%20(100%25)-brightgreen.svg)]()
+[![Tests Passing](https://img.shields.io/badge/Tests-385%2F385%20Passing%20(100%25)-brightgreen.svg)]()
 
 ---
 
@@ -86,7 +86,7 @@ The **AI Legal Document Intelligence Platform** acts as an autonomous legal revi
           │                          │                          │
 ┌─────────▼──────────────────────────▼──────────────────────────▼─────────┐
 │                          Data & Model Layer                             │
-│  PostgreSQL 15 (Neon SSL) • ChromaDB (768-dim) • Gemini 2.5/3.5 Flash   │
+│  PostgreSQL 15 (Neon SSL) • ChromaDB (384-dim) • Gemini 2.5/3.5 Flash   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -101,13 +101,13 @@ For comprehensive technical specifications, state machines, and data schemas, se
 | **Frontend Framework** | React | `19.0.0` | High-performance reactive UI with modern hooks |
 | **Language & Tooling** | TypeScript / Vite | `5.7.2` / `6.2.0` | Strict type safety and lightning-fast HMR builds |
 | **State & Cache** | Zustand / TanStack Query | `5.0.3` / `5.66.0` | Global authentication state and cached API synchronizations |
-| **Styling & UI** | Tailwind CSS / Lucide React | `3.4.17` / `0.475.0` | Accessible, responsive, dark/light themed design system |
+| **Styling & UI** | Hand-crafted CSS + Inline SVG icons | — | Accessible, responsive, dark/light themed design system (no UI framework) |
 | **Backend Framework** | FastAPI / Starlette | `0.115.0+` | Asynchronous Python REST API with OpenAPI validation |
 | **Database & ORM** | PostgreSQL / SQLAlchemy | `15.x/16.x` / `2.0.35` | Relational storage with composite index query optimization |
 | **Database Migrations** | Alembic | `1.13.3` | Schema version control and automated cloud deployments |
 | **AI Orchestration** | LangGraph / LangChain | `0.2.34` / `0.3.0` | Adversarial multi-agent state machines and RAG routing |
-| **LLM & Vision** | Google Gemini 2.5/3.5 Flash | Google AI Studio | Primary dialectic reasoning and OCR document extraction |
-| **Vector Database** | ChromaDB | `0.5.5+` | 768-dimension local embeddings for semantic portfolio search |
+| **LLM & Vision** | Google Gemini Flash-Lite (multi-model cascade) | Google AI Studio | Primary dialectic reasoning and OCR document extraction |
+| **Vector Database** | ChromaDB | `0.5.5+` | 384-dimension local ONNX (all-MiniLM-L6-v2) embeddings for semantic portfolio search |
 | **Observability** | OpenTelemetry / Prometheus | `1.27.0+` | Latency tracking, error rates, and metrics exposition |
 | **Testing** | pytest / Vitest / Playwright | `8.3.3` / `4.1.11` | Automated testing across backend, frontend, and browser E2E |
 
@@ -175,10 +175,10 @@ Open `http://localhost:5173` in your browser.
 
 ## 🧪 Automated Testing & Verification
 
-The platform maintains a **100% automated test pass rate across 365 tests**:
+The platform maintains a **100% automated test pass rate across 385 tests**:
 
 ```bash
-# Run complete backend pytest suite (335 tests)
+# Run complete backend pytest suite (355 tests)
 pytest backend/tests/ -v
 
 # Run complete frontend Vitest suite (30 tests)
@@ -190,9 +190,9 @@ cd frontend && npm run lint && npm run build
 
 | Test Suite | File Count | Tests Passed | Pass Rate | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Backend Multi-Agent & Security** | 42 files | **335 passed** | `100%` | ✅ Passing |
+| **Backend Multi-Agent & Security** | 42 files | **355 passed** | `100%` | ✅ Passing |
 | **Frontend Components & E2E** | 6 files | **30 passed** | `100%` | ✅ Passing |
-| **Total Automated Platform Tests** | **48 files** | **365 passed** | `100%` | ✅ **3/3 CI Green** |
+| **Total Automated Platform Tests** | **48 files** | **385 passed** | `100%` | ✅ **3/3 CI Green** |
 
 ---
 

@@ -60,3 +60,9 @@ backend/uploads/*
 test_chroma_data/
 test_ingestion_chroma/
 desktop.ini
+
+# Internal reports & audit artifacts (kept local, not published to GitHub)
+VIBE_CODED_APP_TEST_SHEET.md
+SECURITY_REPORT.md
+FUNCTIONAL_VERIFICATION.md
+secrets.example.md
