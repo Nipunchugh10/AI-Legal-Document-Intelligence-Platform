@@ -39,10 +39,13 @@ def get_client_ip(request: Request) -> str:
     if not request:
         return "127.0.0.1"
 
-    # 1. Test header override
-    test_ip = request.headers.get("x-test-client-ip")
-    if test_ip:
-        return test_ip.strip()
+    # 1. Test header override — ONLY honored in non-production environments.
+    # In production/staging this header is ignored so a client cannot spoof its
+    # rate-limit bucket by rotating an arbitrary IP value on every request.
+    if get_settings().APP_ENV in {"development", "test"}:
+        test_ip = request.headers.get("x-test-client-ip")
+        if test_ip:
+            return test_ip.strip()
 
     # 2. X-Forwarded-For (Hugging Face Spaces & Reverse Proxies)
     forwarded = request.headers.get("x-forwarded-for")

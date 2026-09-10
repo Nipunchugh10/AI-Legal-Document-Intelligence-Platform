@@ -477,3 +477,54 @@ class TestCredentialsAtRestAndLogScrubbing:
         assert "POSTGRES_PASSWORD='***REDACTED***'" in settings_repr
         assert "GEMINI_API_KEY='***REDACTED***'" in settings_repr
         assert "***REDACTED***" in settings_repr
+
+
+# ---------------------------------------------------------------------------
+# Diagnostics Exposure Hardening (Security Audit — 2026-09-10)
+# ---------------------------------------------------------------------------
+def test_health_db_minimized_for_anonymous_callers():
+    """
+    Public /health/db must not leak DB host, server version, table inventory,
+    or migration revision to unauthenticated callers.
+    """
+    resp = client.get("/health/db")
+    assert resp.status_code in {200, 503}
+    data = resp.json()
+    # Minimal liveness signal only
+    assert "status" in data
+    assert "core_tables_healthy" in data
+    # Sensitive recon fields must be absent from the anonymous payload
+    for leaked in ("host", "version", "tables", "alembic_version", "database", "port"):
+        assert leaked not in data, f"/health/db leaked '{leaked}' to anonymous caller"
+
+
+def test_metrics_gated_in_production(monkeypatch):
+    """
+    In production, /metrics must reject anonymous scraping (404) but allow a
+    caller presenting the configured METRICS_TOKEN.
+    """
+    from app import main as main_module
+
+    monkeypatch.setattr(main_module.settings, "APP_ENV", "production")
+    monkeypatch.setattr(main_module.settings, "EXPOSE_PUBLIC_DIAGNOSTICS", False)
+    monkeypatch.setattr(main_module.settings, "METRICS_TOKEN", "secret-scrape-token")
+
+    # Anonymous scrape is blocked
+    anon = client.get("/metrics")
+    assert anon.status_code == 404
+
+    # Wrong token is blocked
+    wrong = client.get("/metrics", headers={"Authorization": "Bearer nope"})
+    assert wrong.status_code == 404
+
+    # Correct token is allowed
+    ok = client.get("/metrics", headers={"Authorization": "Bearer secret-scrape-token"})
+    assert ok.status_code == 200
+    assert "api_requests_total" in ok.text
+
+
+def test_metrics_open_in_test_environment():
+    """In development/test, /metrics stays open for local observability."""
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    assert "api_requests_total" in resp.text

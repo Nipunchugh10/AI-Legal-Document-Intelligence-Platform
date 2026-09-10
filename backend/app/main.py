@@ -372,7 +372,21 @@ async def db_health_check():
     """
     from app.core.database import check_database_connection
     diag = check_database_connection()
-    status_code = 200 if diag["status"] == "connected" and diag.get("core_tables_healthy") else 503
+    healthy = diag["status"] == "connected" and diag.get("core_tables_healthy")
+    status_code = 200 if healthy else 503
+
+    # Full diagnostics (DB host, server version, table inventory, migration revision)
+    # are sensitive and available only to authenticated admins via /admin/db-health.
+    # Anonymous callers receive a minimal liveness signal unless explicitly opted in.
+    if not settings.EXPOSE_PUBLIC_DIAGNOSTICS:
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": diag["status"],
+                "core_tables_healthy": bool(diag.get("core_tables_healthy")),
+                "latency_ms": diag.get("latency_ms"),
+            },
+        )
     return JSONResponse(status_code=status_code, content=diag)
 
 
@@ -387,8 +401,29 @@ async def metrics_endpoint(request: Request, format: Optional[str] = None):
     Prometheus & OpenTelemetry metrics scrape endpoint (Day 55).
     Returns standard Prometheus exposition format (text/plain) by default.
     Returns application/json when requested via '?format=json' or Accept header.
+
+    Access control (Security Hardening): the metrics payload exposes the internal
+    route map, latency percentiles, and error/auth-anomaly counters, so anonymous
+    scraping is disabled by default. Access requires ONE of:
+      - a matching bearer token when METRICS_TOKEN is configured, or
+      - EXPOSE_PUBLIC_DIAGNOSTICS=true (self-hosted / trusted-network deployments).
+    Authenticated operators can always read the same data via /admin/telemetry.
     """
     from fastapi.responses import PlainTextResponse
+
+    # Anonymous scraping is disabled in production/staging (mirrors the app's
+    # environment-tiered hardening). In those environments access requires a
+    # bearer token matching METRICS_TOKEN, unless EXPOSE_PUBLIC_DIAGNOSTICS is
+    # explicitly enabled. Development/test keep the endpoint open for local use.
+    gated = settings.APP_ENV in {"production", "staging"} and not settings.EXPOSE_PUBLIC_DIAGNOSTICS
+    if gated:
+        provided = request.headers.get("authorization", "")
+        token = provided[7:].strip() if provided.lower().startswith("bearer ") else ""
+        import hmac as _hmac
+        allowed = bool(settings.METRICS_TOKEN) and _hmac.compare_digest(token, settings.METRICS_TOKEN)
+        if not allowed:
+            raise HTTPException(status_code=404, detail="Not found")
+
     accept = request.headers.get("accept", "")
     if format == "json" or "application/json" in accept:
         return JSONResponse(content=metrics_collector.get_snapshot())

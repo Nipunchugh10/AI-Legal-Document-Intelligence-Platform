@@ -6,6 +6,7 @@ Handles generating, sending (via Email / console mock), and verifying 6-digit OT
 Day 14 (Refactored) — Email-Based Two-Factor Authentication
 """
 
+import hmac
 import secrets
 import logging
 from datetime import datetime, timezone, timedelta
@@ -170,7 +171,7 @@ def verify_otp(db: Session, email: str, submitted_code: str) -> bool:
 
     # Verify code hash
     submitted_hash = hash_token(submitted_code)
-    if otp_entry.otp_hash != submitted_hash:
+    if not hmac.compare_digest(otp_entry.otp_hash, submitted_hash):
         otp_entry.attempts += 1
         db.commit()
 

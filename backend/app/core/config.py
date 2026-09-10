@@ -37,6 +37,7 @@ SENSITIVE_CONFIG_KEYS: set[str] = {
     "LANGCHAIN_API_KEY",
     "GOOGLE_CLIENT_SECRET",
     "SMTP_PASSWORD",
+    "METRICS_TOKEN",
 }
 
 
@@ -273,6 +274,15 @@ class Settings(BaseSettings):
     # --- File Upload ---
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
+
+    # --- Observability / Diagnostics Exposure (Security Hardening) ---
+    # When False (default), unauthenticated /health/db and /metrics endpoints
+    # return only a minimal liveness signal. Detailed diagnostics (DB host,
+    # server version, table names, internal route metrics) are never exposed to
+    # anonymous callers in production. An optional bearer token can re-enable the
+    # full /metrics payload for a trusted Prometheus scraper.
+    EXPOSE_PUBLIC_DIAGNOSTICS: bool = False
+    METRICS_TOKEN: str = ""
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
