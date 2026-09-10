@@ -1,0 +1,165 @@
+/* ==========================================================================
+   ErrorScreen — unified, theme-aware error / empty-state surface.
+   Uses the global design tokens (index.css) so it matches dark + light.
+   ========================================================================== */
+
+.error-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 48px 24px;
+}
+
+.error-screen--page {
+  min-height: 62vh;
+}
+
+.error-screen--full {
+  min-height: 100vh;
+  background: var(--color-bg, #05050c);
+}
+
+.error-screen__card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  padding: 44px 36px 36px;
+  border-radius: 20px;
+  background: var(--color-surface-card, rgba(15, 17, 32, 0.65));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  box-shadow: var(--shadow-lg, 0 25px 50px -12px rgba(0, 0, 0, 0.8));
+  backdrop-filter: var(--backdrop-blur, blur(16px));
+  -webkit-backdrop-filter: var(--backdrop-blur, blur(16px));
+  overflow: hidden;
+  animation: error-screen-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes error-screen-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Oversized watermark status code */
+.error-screen__code {
+  font-family: var(--font-display, sans-serif);
+  font-size: clamp(3.5rem, 12vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--color-primary, #5c62ec), var(--color-secondary, #c084fc));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+  user-select: none;
+}
+
+.error-screen__icon {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--color-text-main, #f3f4f6);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+}
+.error-screen__icon svg { width: 24px; height: 24px; }
+
+/* Kind-specific accent on the icon */
+.error-screen--forbidden .error-screen__icon { color: var(--color-danger, #f43f5e); background: var(--color-danger-bg, rgba(244, 63, 94, 0.1)); }
+.error-screen--server .error-screen__icon,
+.error-screen--network .error-screen__icon { color: var(--color-warning, #f59e0b); background: var(--color-warning-bg, rgba(245, 158, 11, 0.1)); }
+.error-screen--notfound .error-screen__icon { color: var(--color-accent, #38bdf8); background: rgba(56, 189, 248, 0.1); }
+
+.error-screen__title {
+  font-family: var(--font-display, sans-serif);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-text-main, #f3f4f6);
+  margin: 0 0 10px;
+}
+
+.error-screen__message {
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0 auto 26px;
+  max-width: 38ch;
+}
+
+.error-screen__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.error-screen__btn {
+  padding: 11px 22px;
+  border-radius: 10px;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--transition-fast, 0.2s ease), background var(--transition-fast, 0.2s ease), box-shadow var(--transition-fast, 0.2s ease);
+}
+.error-screen__btn:active { transform: translateY(1px); }
+
+.error-screen__btn--primary {
+  border: none;
+  color: #fff;
+  background: var(--color-primary, #5c62ec);
+  box-shadow: 0 8px 20px -8px var(--color-primary-glow, rgba(92, 98, 236, 0.3));
+}
+.error-screen__btn--primary:hover { background: var(--color-primary-hover, #4a50d4); box-shadow: var(--shadow-glow, 0 0 40px -10px rgba(92, 98, 236, 0.3)); }
+
+.error-screen__btn--secondary {
+  border: 1px solid var(--color-border-hover, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-main, #f3f4f6);
+}
+.error-screen__btn--secondary:hover { background: var(--color-surface-hover, rgba(26, 29, 54, 0.8)); }
+
+.error-screen__detail-wrap { margin-top: 22px; }
+
+.error-screen__detail-toggle {
+  background: none;
+  border: none;
+  color: var(--color-text-dark, #64748b);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.error-screen__detail-toggle:hover { color: var(--color-text-muted, #94a3b8); }
+
+.error-screen__detail {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  color: var(--color-danger, #fda4af);
+  font-size: 0.75rem;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+
+/* Light theme refinements */
+.light-theme .error-screen--full { background: var(--color-bg); }
+.light-theme .error-screen__detail { background: rgba(0, 0, 0, 0.04); color: #b91c1c; }
+.light-theme .error-screen__icon { background: rgba(0, 0, 0, 0.03); }
+
+@media (max-width: 520px) {
+  .error-screen__card { padding: 34px 22px 28px; }
+  .error-screen__actions { flex-direction: column; }
+  .error-screen__btn { width: 100%; }
+}

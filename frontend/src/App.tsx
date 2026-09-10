@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Welcome } from "./pages/Welcome";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -12,6 +12,7 @@ import { SearchPage } from "./pages/SearchPage";
 import { Security } from "./pages/Security";
 import { HistoryPage } from "./pages/HistoryPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/useAuthStore";
 import "./App.css";
@@ -52,10 +53,14 @@ export const App: React.FC = () => {
             <Route path="/security" element={<Security />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/conversations" element={<ConversationsPage />} />
-          </Route>
 
-          {/* Fallback Catch-All Route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+            {/*
+              Catch-all for unknown paths. Placed INSIDE the protected group so an
+              authenticated user gets a proper in-app 404 (nav shell + session kept),
+              while an unauthenticated visitor is redirected to /login by ProtectedRoute.
+            */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </ToastProvider>

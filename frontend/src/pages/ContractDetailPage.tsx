@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import { fetchConversations, type ConversationItem } from "../services/historyService";
+import { ErrorScreen } from "../components/ErrorScreen";
+import { classifyError, type ClassifiedError } from "../services/errorUtils";
 import "./ContractDetailPage.css";
 
 interface ContractInfo {
@@ -69,7 +71,10 @@ export const ContractDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "clauses" | "risks" | "compliance" | "negotiation" | "text">("overview");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<ClassifiedError | null>(null);
+  // Non-fatal, in-page action errors (e.g. a failed analysis re-run) — shown as a
+  // dismissible banner without tearing down the already-loaded workspace.
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   // Filters & State
   const [riskFilter, setRiskFilter] = useState<"ALL" | "RED" | "YELLOW" | "GREEN">("ALL");
@@ -84,9 +89,16 @@ export const ContractDetailPage: React.FC = () => {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
 
   const fetchWorkspaceData = async () => {
-    if (!id) return;
+    // Defense-in-depth: reject non-numeric / non-positive IDs before hitting the API.
+    // (The backend also enforces this and scopes every query to the owner.)
+    const numericId = Number(id);
+    if (!id || !Number.isInteger(numericId) || numericId <= 0) {
+      setFetchError(classifyError({ response: { status: 404 } }, "contract"));
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
-    setErrorMsg(null);
+    setFetchError(null);
 
     try {
       // 1. Fetch Contract Metadata
@@ -119,8 +131,10 @@ export const ContractDetailPage: React.FC = () => {
       } catch {
         // Non-critical, ignore
       }
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Failed to load contract intelligence workspace.");
+    } catch (err) {
+      // The contract-metadata fetch failed. A 403/404 means the document isn't
+      // this user's (or doesn't exist) — show a scoped error, keep the session.
+      setFetchError(classifyError(err, "contract"));
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +169,7 @@ export const ContractDetailPage: React.FC = () => {
           } else if (res.data.status === "failed") {
             setContract(res.data);
             setIsAnalyzing(false);
-            setErrorMsg("Background contract analysis encountered an issue. Please click 'Re-Run Multi-Agent Analysis'.");
+            setActionMsg("Background contract analysis encountered an issue. Please click 'Re-Run Multi-Agent Analysis'.");
           }
         } catch {
           // Ignore transient polling failure
@@ -171,7 +185,7 @@ export const ContractDetailPage: React.FC = () => {
   const handleRunAnalysis = async (force: boolean = false) => {
     if (!id) return;
     setIsAnalyzing(true);
-    setErrorMsg(null);
+    setActionMsg(null);
 
     try {
       const response = await api.post<AnalysisPayload>(`/contracts/${id}/analyze?force=${force}`);
@@ -200,9 +214,9 @@ export const ContractDetailPage: React.FC = () => {
       setIsAnalyzing(false);
       const rawDetail = err.response?.data?.detail || err.message || "Multi-Agent Analysis failed.";
       if (typeof rawDetail === "string" && (rawDetail.includes("429") || rawDetail.toLowerCase().includes("quota"))) {
-        setErrorMsg("Google AI rate limit reached. Please wait a few seconds while fallback models initialize, then click Re-Run.");
+        setActionMsg("Google AI rate limit reached. Please wait a few seconds while fallback models initialize, then click Re-Run.");
       } else {
-        setErrorMsg(typeof rawDetail === "string" ? rawDetail.slice(0, 200) : "Multi-Agent Analysis failed. Please try again.");
+        setActionMsg(typeof rawDetail === "string" ? rawDetail.slice(0, 200) : "Multi-Agent Analysis failed. Please try again.");
       }
     }
   };
@@ -418,15 +432,34 @@ ${(analysisData.compliance_issues || [])
     );
   }
 
+  if (fetchError) {
+    const retryable = fetchError.kind === "network" || fetchError.kind === "server";
+    return (
+      <ErrorScreen
+        code={fetchError.code}
+        kind={fetchError.kind}
+        title={fetchError.title}
+        message={fetchError.message}
+        detail={fetchError.detail}
+        actions={[
+          { label: "Back to Vault", onClick: () => navigate("/dashboard"), variant: "primary" },
+          ...(retryable
+            ? [{ label: "Try Again", onClick: () => fetchWorkspaceData(), variant: "secondary" as const }]
+            : []),
+        ]}
+      />
+    );
+  }
+
   if (!contract) {
     return (
-      <div className="placeholder-hero-card" style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center" }}>
-        <h2>Contract Not Found</h2>
-        <p>The requested document could not be found or you do not have permission to view it.</p>
-        <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-          Return to Contract Vault
-        </button>
-      </div>
+      <ErrorScreen
+        code="404"
+        kind="notfound"
+        title="Contract Not Found"
+        message="This document doesn't exist, or it belongs to another account and isn't available to you."
+        actions={[{ label: "Return to Contract Vault", onClick: () => navigate("/dashboard"), variant: "primary" }]}
+      />
     );
   }
 
@@ -512,14 +545,22 @@ ${(analysisData.compliance_issues || [])
         </div>
       </section>
 
-      {errorMsg && (
-        <div className="alert alert-danger" style={{ margin: "0 0 20px 0" }}>
+      {actionMsg && (
+        <div className="alert alert-danger" style={{ margin: "0 0 20px 0", display: "flex", alignItems: "center", gap: "10px" }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <span>{errorMsg}</span>
+          <span style={{ flex: 1 }}>{actionMsg}</span>
+          <button
+            type="button"
+            onClick={() => setActionMsg(null)}
+            aria-label="Dismiss"
+            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, opacity: 0.7 }}
+          >
+            ×
+          </button>
         </div>
       )}
 

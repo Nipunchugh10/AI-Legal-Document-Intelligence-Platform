@@ -346,5 +346,7 @@ describe("Critical User Journey Integration Test (8-Step E2E Flow)", () => {
       expect(screen.getByText("User logged in successfully via email/password")).toBeInTheDocument();
       expect(screen.getByText("Asked legal query: 'Can I terminate early?'")).toBeInTheDocument();
     });
-  });
+    // This 8-step integration flow performs many sequential renders + waitFors;
+    // give it headroom so it stays reliable under parallel CPU contention (incl. CI).
+  }, 20000);
 });

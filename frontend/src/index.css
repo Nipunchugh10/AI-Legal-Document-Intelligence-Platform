@@ -1152,3 +1152,59 @@ a:hover {
 
 
 
+
+/* ==========================================================================
+   Accessibility & readability polish (additive — appended safely).
+   Keyboard focus rings, reduced-motion support, brand selection, themed
+   scrollbars. These raise the app to industry-level a11y without altering
+   the existing visual design.
+   ========================================================================== */
+
+/* Keyboard-only focus ring (does NOT trigger on mouse click). */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Inputs already style :focus; keep their ring subtle and on-brand. */
+.form-control:focus-visible { outline: none; }
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Brand-tinted text selection for a cohesive feel. */
+::selection {
+  background: rgba(92, 98, 236, 0.35);
+  color: #fff;
+}
+.light-theme ::selection {
+  background: rgba(92, 98, 236, 0.22);
+  color: #111;
+}
+
+/* Smooth in-page anchor scrolling. */
+html { scroll-behavior: smooth; }
+
+/* Thin, theme-aware scrollbars (Firefox + WebKit). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); background-clip: content-box; }

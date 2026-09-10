@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import api from "../services/api";
+import { ErrorScreen } from "../components/ErrorScreen";
+import { classifyError, type ClassifiedError } from "../services/errorUtils";
 import {
   fetchConversationDetail,
   fetchConversations,
@@ -55,6 +57,7 @@ export const QAPage: React.FC = () => {
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [isLoadingContract, setIsLoadingContract] = useState(true);
+  const [fetchError, setFetchError] = useState<ClassifiedError | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -70,8 +73,14 @@ export const QAPage: React.FC = () => {
 
   // Fetch contract metadata & full text
   useEffect(() => {
-    if (!id) return;
+    const numericId = Number(id);
+    if (!id || !Number.isInteger(numericId) || numericId <= 0) {
+      setFetchError(classifyError({ response: { status: 404 } }, "contract"));
+      setIsLoadingContract(false);
+      return;
+    }
     setIsLoadingContract(true);
+    setFetchError(null);
 
     const loadData = async () => {
       try {
@@ -87,7 +96,8 @@ export const QAPage: React.FC = () => {
           // Document text not available yet
         }
       } catch (err) {
-        console.error("Failed to load contract details for Q&A", err);
+        // 403/404 → not this user's contract; show a scoped error, keep session.
+        setFetchError(classifyError(err, "contract"));
       } finally {
         setIsLoadingContract(false);
       }
@@ -127,9 +137,11 @@ export const QAPage: React.FC = () => {
     let isMounted = true;
     setIsLoadingThread(true);
 
-    fetchConversationDetail(activeConversationId)
-      .then((detail) => {
-        if (!isMounted) return;
+    (async () => {
+      try {
+        const detail = await Promise.resolve(fetchConversationDetail(activeConversationId));
+        if (!isMounted || !detail || !Array.isArray(detail.messages)) return;
+
         const mapped: ChatMessage[] = detail.messages.map((m) => ({
           id: m.id,
           sender: m.role,
@@ -146,13 +158,12 @@ export const QAPage: React.FC = () => {
         if (lastAiMsg?.cited_clause_refs && lastAiMsg.cited_clause_refs.length > 0) {
           setSelectedCitation(lastAiMsg.cited_clause_refs[0]);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Failed to load conversation thread detail:", err);
-      })
-      .finally(() => {
+      } finally {
         if (isMounted) setIsLoadingThread(false);
-      });
+      }
+    })();
 
     return () => {
       isMounted = false;
@@ -331,15 +342,23 @@ ${messages
     );
   }
 
-  if (!contract) {
+  if (fetchError || !contract) {
+    const e = fetchError ?? classifyError({ response: { status: 404 } }, "contract");
+    const retryable = e.kind === "network" || e.kind === "server";
     return (
-      <div className="placeholder-hero-card" style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center" }}>
-        <h2>Contract Not Found</h2>
-        <p>The requested document could not be found or you do not have permission to view it.</p>
-        <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-          Return to Contract Vault
-        </button>
-      </div>
+      <ErrorScreen
+        code={e.code}
+        kind={e.kind}
+        title={e.title}
+        message={e.message}
+        detail={e.detail}
+        actions={[
+          { label: "Back to Vault", onClick: () => navigate("/dashboard"), variant: "primary" },
+          ...(retryable && id
+            ? [{ label: "Try Again", onClick: () => navigate(0), variant: "secondary" as const }]
+            : []),
+        ]}
+      />
     );
   }
 
