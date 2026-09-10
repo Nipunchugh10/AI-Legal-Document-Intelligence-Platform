@@ -247,19 +247,56 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 
-FRONTEND_DIST_CANDIDATES = [
-    Path(__file__).resolve().parents[2] / "frontend" / "dist",
-    Path("/app/frontend/dist"),
-    Path("/app/dist"),
-]
+def _discover_frontend_dist() -> Optional[Path]:
+    """
+    Robustly locate the compiled React SPA (frontend/dist) across every runtime
+    layout we deploy to: local dev, Docker (/app), and Hugging Face Spaces
+    (/home/user/app). We check a broad set of explicit candidates AND walk up the
+    parents of both this file and the current working directory looking for a
+    `frontend/dist/index.html`. Every candidate and the final result are logged so
+    the container's startup logs make any future miss self-diagnosing.
+    """
+    import os
 
-frontend_dist = next(
-    (p for p in FRONTEND_DIST_CANDIDATES if p.exists() and (p / "index.html").exists()),
-    None,
-)
+    here = Path(__file__).resolve()
+    cwd = Path(os.getcwd()).resolve()
+
+    candidates: list[Path] = [
+        here.parents[2] / "frontend" / "dist",   # <repo>/backend/app/main.py -> <repo>/frontend/dist
+        here.parents[1] / "frontend" / "dist",   # defensive: alternate nesting
+        here.parents[3] / "frontend" / "dist" if len(here.parents) > 3 else here.parents[2] / "frontend" / "dist",
+        cwd / "frontend" / "dist",
+        Path("/home/user/app/frontend/dist"),    # Hugging Face Spaces (Gradio SDK) layout
+        Path("/app/frontend/dist"),              # Docker image layout
+        Path("/app/dist"),
+        here.parents[2] / "dist",
+    ]
+
+    # Walk upward from this file and the cwd to catch any layout we didn't hardcode.
+    for base in {here, cwd}:
+        for parent in [base, *base.parents][:6]:
+            candidates.append(parent / "frontend" / "dist")
+
+    seen: set[str] = set()
+    logger.info("Frontend discovery: __file__=%s cwd=%s", here, cwd)
+    for c in candidates:
+        key = str(c)
+        if key in seen:
+            continue
+        seen.add(key)
+        ok = c.exists() and (c / "index.html").exists()
+        logger.info("Frontend candidate %s -> %s", c, "FOUND" if ok else "missing")
+        if ok:
+            return c
+    return None
+
+
+frontend_dist = _discover_frontend_dist()
 
 if frontend_dist:
     logger.info("Serving frontend static assets from %s", frontend_dist)
+else:
+    logger.warning("Frontend dist NOT found in any candidate path — SPA will fall back to /docs.")
 
 
 @app.middleware("http")
