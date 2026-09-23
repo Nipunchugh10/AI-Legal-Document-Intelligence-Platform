@@ -87,6 +87,13 @@ async def lifespan(app: FastAPI):
     # Start the session cleanup task in the background
     cleanup_task = asyncio.create_task(session_cleanup_loop())
 
+    # Ensure demo evaluation accounts and sample data are seeded if database is available
+    try:
+        from app.services.demo_service import ensure_demo_accounts_synced
+        ensure_demo_accounts_synced()
+    except Exception as e:
+        logger.debug("Lifespan demo accounts check: %s", e)
+
     yield
 
     # Cancel cleanup task on shutdown

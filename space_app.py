@@ -45,8 +45,18 @@ def run_startup_migrations():
                 print("[!] Warning: alembic.ini not found at", alembic_ini)
         except Exception as e:
             print(f"[!] Migration notice: {e}")
+
+        try:
+            from app.services.demo_service import ensure_demo_accounts_synced
+            ensure_demo_accounts_synced()
+            print("[+] Demo accounts and evaluation dataset verified in cloud database.")
+        except Exception as e:
+            print(f"[!] Demo seeding notice: {e}")
     else:
         print("[*] Notice: DATABASE_URL not set. Running with default/local database configuration.")
+
+# Ensure migrations and demo data are initialized on startup (critical for Hugging Face Spaces)
+run_startup_migrations()
 
 # Import the core FastAPI application
 from app.main import app as fastapi_app

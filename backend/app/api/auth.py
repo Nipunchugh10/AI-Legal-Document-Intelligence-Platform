@@ -130,7 +130,14 @@ def login(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Authenticate a user, establish a session, and issue access & refresh tokens or trigger 2FA."""
-    from app.services.otp_service import send_otp
+    # Frictionless demo account support: ensure demo accounts are provisioned if requested
+    email_clean = (body.email or "").strip().lower()
+    if email_clean in {"demo@legalai.com", "lawyer@example.com"}:
+        try:
+            from app.services.demo_service import ensure_demo_accounts_synced
+            ensure_demo_accounts_synced(db)
+        except Exception:
+            pass
 
     user = db.query(User).filter(User.email == body.email).first()
 

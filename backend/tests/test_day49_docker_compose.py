@@ -128,9 +128,10 @@ def test_backend_dockerfile_and_entrypoint():
     entrypoint_path = os.path.join(REPO_ROOT, "backend", "entrypoint.sh")
     assert os.path.isfile(entrypoint_path)
 
-    # Check executable permission
-    st = os.stat(entrypoint_path)
-    assert bool(st.st_mode & stat.S_IXUSR), "entrypoint.sh must be executable (chmod +x)"
+    # Check executable permission (POSIX systems only; Windows NTFS does not track S_IXUSR)
+    if sys.platform != "win32":
+        st = os.stat(entrypoint_path)
+        assert bool(st.st_mode & stat.S_IXUSR), "entrypoint.sh must be executable (chmod +x)"
 
     with open(entrypoint_path, "r", encoding="utf-8") as f:
         ep_content = f.read()
